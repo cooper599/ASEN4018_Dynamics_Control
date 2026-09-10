@@ -86,28 +86,20 @@ aero_forces_matrix = -nu * airspeed * [u; v; w];
 
 vel_dot = angle_vel_matrix + g * grav_matrix + (1/m) * aero_forces_matrix + (1/m)*[0;0;Zc];
 
-%% NEED TO CHANGE THIS FOR FULL I MATRIX NOT JUST DIAGONAL
 % I(1,1) = Ixx, I(2,2) = Iyy, I(3,3) = Izz
 I_ang_rate_matrix = [GammaArr(1)*p*q-GammaArr(2)*q*r;...
                      GammaArr(5)*p*r-GammaArr(6)*(p^2-r^2);...
                      GammaArr(7)*p*q-GammaArr(1)*q*r];
+
 Moment_Matrix = [GammaArr(3)*L+GammArr(4)*N;...
                 M/I(2,2);...
                 GammaArr(4)*L+GammaArr(8)*N];
+
 control_moment_matrix = [Lc/I(1,1);...
                          Mc/I(2,2);...
                          Nc/I(3,3)];
-ang_rate_dot = I_ang_rate_matrix + Moment_Matrix + control_moment_matrix;
 
-% old stuff below
-% Build [p_dot, q_dot, r_dot]: 
-% I_ang_rate_matrix = [((Iy-Iz)/Ix)*ang_rate_q*ang_rate_r;
-%             ((Iz-Ix)/Iy)*ang_rate_p*ang_rate_r;
-%             ((Ix-Iy)/Iz)*ang_rate_p*ang_rate_q];
-% 
-% moment_matrix = [L/Ix;M/Iy;N/Iz];
-% control_moment_matrix = [Lc/Ix;Mc/Iy;Nc/Iz];
-% ang_rate_dot = I_ang_rate_matrix + moment_matrix + control_moment_matrix;
+ang_rate_dot = I_ang_rate_matrix + Moment_Matrix + control_moment_matrix;
 
 % Put together derivative state vector
 var_dot = [pos_dot; ang_dot; vel_dot; ang_rate_dot];
