@@ -4,7 +4,6 @@
 % Expanding to assume isn't perfectly symmetric quadrotor (needs full GAMMA
 % matrix)
 
-% Change motor_force to controller stuiff
 function var_dot = QuadrotorEOM(t, var, g, m, I, d, km, nu, mu, controller_func, controller_type)
 %{
 % Description: Full non-linear equations of motion to be used in ode45
