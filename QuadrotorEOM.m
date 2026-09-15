@@ -4,43 +4,51 @@
 % Expanding to assume isn't perfectly symmetric quadrotor (needs full GAMMA
 % matrix)
 
-function var_dot = QuadrotorEOM(t, var, g, m, I, d, km, nu, mu, controller_func, controller_type)
+function var_dot = QuadrotorEOM(t, var, params, controller_func)
 %{
 % Description: Full non-linear equations of motion to be used in ode45
 Inputs: 
   t: time [s]
   var: 12 x 1 aircraft state vector [varying units]
-  g: acceleration due to gravity [m/s^2]
-  m: mass of quadcopter [kg]
-  I: inertia tensor [kg m^2]
-  d: distance between center of mass and propeller [m]
-  km: control moment coefficient [(N*m)/N]
-  nu: aerodynamic force coefficient [N/(m/s)^2]
-  mu: aerodyanmic moment coefficient [N*m/(rad/s)^2]
+  params:
+    g: acceleration due to gravity [m/s^2]
+    m: mass of quadcopter [kg]
+    I: inertia tensor [kg m^2]
+    d: distance between center of mass and propeller [m]
+    km: control moment coefficient [(N*m)/N]
+    nu: aerodynamic force coefficient [N/(m/s)^2]
+    mu: aerodyanmic moment coefficient [N*m/(rad/s)^2]
   controller_func: contains logic to caluclate motor forces necessary for stabilization given specific type of control (PD, PID, ...)
-  controller_type: string for plotting of what controller type used? may or may not use
 
 Outputs: 
    var_dot: 12 x 1 derivative of the state vector
 %}
 
 % Seperate state vector:
-x = var(1);
-y = var(2);
-z = var(3);
-phi = var(4);
-theta = var(5);
-psi = var(6);
-u = var(7);
-v = var(8);
-w = var(9);
-p = var(10);
-q = var(11);
-r = var(12);
+x = var(1); y = var(2); z = var(3);
+
+phi = var(4); theta = var(5); psi = var(6);
+
+u = var(7); v = var(8); w = var(9);
+
+p = var(10); q = var(11); r = var(12);
+
+% Separate Params
+% Weight
+g = params.g; m = params.m;
+
+% Structural
+I = params.I; d = params.d; km = params.km;
+
+% Flying
+nu = params.nu; mu = params.mu;
 
 % Calculate Motor Forces usiing specific control function
 % Pass in t and state vector to calculate gains within???
-motor_forces = controller_func(t, var);
+% Use the motor forces to calculate actual control forces
+
+% Statevector -> motor forces -> calculate controls from limited motor forces
+motor_forces = controller_func(t, var, params);
 
 % Calculate Gamma Matrix for p,q,r dot
 GammaArr = calculateGammas(I);
@@ -90,7 +98,7 @@ I_ang_rate_matrix = [GammaArr(1)*p*q-GammaArr(2)*q*r;...
                      GammaArr(5)*p*r-GammaArr(6)*(p^2-r^2);...
                      GammaArr(7)*p*q-GammaArr(1)*q*r];
 
-Moment_Matrix = [GammaArr(3)*L+GammArr(4)*N;...
+Moment_Matrix = [GammaArr(3)*L+GammaArr(4)*N;...
                 M/I(2,2);...
                 GammaArr(4)*L+GammaArr(8)*N];
 
