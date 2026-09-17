@@ -4,7 +4,7 @@
 % Expanding to assume isn't perfectly symmetric quadrotor (needs full GAMMA
 % matrix)
 
-function var_dot = QuadrotorEOM(t, var, params, controller_func)
+function var_dot = QuadrotorEOM(t, var, targets, params, controller_func)
 %{
 % Description: Full non-linear equations of motion to be used in ode45
 Inputs: 
@@ -48,7 +48,7 @@ nu = params.nu; mu = params.mu;
 % Use the motor forces to calculate actual control forces
 
 % Statevector -> motor forces -> calculate controls from limited motor forces
-motor_forces = controller_func(t, var, params);
+motor_forces = controller_func(t, var, targets, params);
 
 % Calculate Gamma Matrix for p,q,r dot
 GammaArr = calculateGammas(I);

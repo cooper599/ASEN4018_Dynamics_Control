@@ -22,13 +22,31 @@ function motor_forces = PD_controller(t, var, targets, params)
     phi = var(4); theta = var(5); psi = var(6);
     u = var(7); v = var(8); w = var(9);
     p = var(10); q = var(11); r = var(12);
-    
-    % Calculate Vertical control
-    Zc = params.m * params.g - params.Kpz*(targets.z-z)-params.Kdz*(targets.w-w);
 
-    % Calculate needed angles for speed controls (pitch and roll/x and y speed)
-    phi_d = -1/params.g * (params.Kpv*(targets.v-v));
-    theta_d = 1/params.g * (params.Kpu*(targets.u-u));
+    V_body = [u; v; w];
+
+    % 2. Build the standard rotation matrix from Body to Inertial (matching your pos_matrix)
+    R = [cos(theta)*cos(psi), sin(phi)*sin(theta)*cos(psi)-cos(phi)*sin(psi), cos(phi)*sin(theta)*cos(psi)+sin(phi)*sin(psi);
+         cos(theta)*sin(psi), sin(phi)*sin(theta)*sin(psi)+cos(phi)*cos(psi), cos(phi)*sin(theta)*sin(psi)-sin(phi)*cos(psi);
+         -sin(theta),         sin(phi)*cos(theta),                           cos(phi)*cos(theta)];
+    
+    % 3. Transform body velocities to inertial velocities
+    V_inertial = R * V_body;
+    x_dot = V_inertial(1);
+    y_dot = V_inertial(2);
+
+    % Given x,y,z (from guidance and nav), calculate desired angles to get there (roll/pitch)
+    % May have switched signs
+    phi_d = 1/params.g * (params.Kpy * (targets.y - y) + params.Kdy * (targets.v - y_dot));
+    theta_d = -1/params.g * (params.Kpx * (targets.x - x) + params.Kdx * (targets.u - x_dot));
+
+    % phi_d = 0;
+    % theta_d = 0;
+
+    % Calculate Vertical control
+    Zc_temp = -(params.m * params.g) + params.Kpz*(targets.z-z) + params.Kdz*(targets.w-w);
+    den = cos(phi)*cos(theta);
+    Zc = Zc_temp / max(den,0.1); % Adds safetly for div 0 error
 
     % Calculate speed control
     Lc = params.Kpphi * (phi_d - phi) - params.Kdphi * p;

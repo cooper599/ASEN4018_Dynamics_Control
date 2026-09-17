@@ -12,5 +12,5 @@ function motor_forces = ControlAllocation(virtual_controls, params)
       
     motor_forces = M \ virtual_controls;
     % Make sure actual motor force is limited to physical model
-    motor_forces = max(0, min(motor_forces, params.max_force)); % Saturation check
+    motor_forces = max(0, min(motor_forces, params.max_motor_force)); % Saturation check
 end
