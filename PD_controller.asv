@@ -24,18 +24,24 @@ function motor_forces = PD_controller(t, var, targets, params)
     p = var(10); q = var(11); r = var(12);
     
     % Calculate Vertical control
-    Zc = params.m * params.g - params.Kpz*(targets.z-z)-params.Kdz*(targets.w-w);
+    ez = targets.z - z;
+    ew = targets.w - w;
+    Zc = params.m * params.g - params.Kpz*ez-params.Kdz*ew;
 
     % Calculate needed angles for speed controls (pitch and roll/x and y speed)
-    phi_d = -1/params.g * (params.Kpv*(targets.v-v));
+    eu = targets.u - u;
+    ev = target.v -v;
+    phi_d = -(params.kpv;
     theta_d = 1/params.g * (params.Kpu*(targets.u-u));
 
     % Calculate speed control
-    Lc = params.Kpphi * (targets.phi - phi) - params.Kdphi * p;
-    Mc = params.Kptheta * (targets.theta - theta) - params.Kdtheta * q;
+    Lc = params.Kpphi * (phi_d - phi) - params.Kdphi * p;
+    Mc = params.Kptheta * (theta_d - theta) - params.Kdtheta * q;
 
     % Calculate spin control
     Nc = params.Kppsi * (targets.psi - psi) - params.Kdpsi * r;
 
-    % Consolitdat
+    % Consolitdate
+    virtual_controls = [Zc;Lc;Mc;Nc];
+    motor_forces = ControlAllocation(virtual_controls,params);
 end
