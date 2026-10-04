@@ -10,14 +10,16 @@ params = getParams();
 opt = odeset('RelTol', 1e-6, 'AbsTol', 1e-9);
 
 % Time span and initial conditions
-tspan = [0 10];
+tspan = [0 100];
 
 % Steady hover at (0,0,2) in normal coord system
-ang_pert = deg2rad(5); % 5 degree angle perturbation
-init_cond = [0; 0; -2;...
-             ang_pert/2; ang_pert; 0;...
-             0; 0; 0;...
-             0; 0; 0];
+ang_pert = deg2rad(40); % 5 degree angle perturbation
+init_cond = [0; 0; 0;... x,y,z
+             ang_pert; 0; 0;...  phi, theta, psi
+             0; 0; 0;...  u, v, w
+             0; 0; 0;...  p, q, r
+             0; 0; 0;...  x,y,z errors
+             0; 0; 0];  % phi, theta, psi errors
 
 % Targets throughout, currently testing hover
 % z, u, v, w, psi. Can add more assuming nav will give us either target
@@ -43,13 +45,16 @@ Mc_hist = zeros(num_steps, 1);
 Nc_hist = zeros(num_steps, 1);
 motor_forces_hist = zeros(num_steps, 4);
 
+errors = var_dot(:,13:18);
+var_dot = var_dot(:,1:12);
+
 for i = 1:num_steps
     % Extract the 12x1 state vector at time step i
     current_state = var_dot(i, :)'; 
     current_t = t(i);
     
     % Call your controller exactly how it runs inside the EOM
-    forces = PD_controller(current_t, current_state, targets, params);
+    forces = PD_controller(current_t, current_state, errors, targets, params);
     motor_forces_hist(i, :) = forces';
     
     % Reconstruct the moments using your Forward Mixer Matrix
@@ -66,5 +71,52 @@ control_input_array = [Zc_hist, Lc_hist, Mc_hist, Nc_hist];
 
 plot_tol = 6; % round to 8 decimals
 % Plotting
-PlotAircraftSim(t,round(var_dot,plot_tol),round(control_input_array,plot_tol),[1,2,3,4,5,6],'g-',0,'',"Test Hover")
+PlotAircraftSim(t,round(var_dot,plot_tol),round(control_input_array,plot_tol),[1,2,3,4,5,6],'g-',0,'',"Test Hover PD")
+
+figure(7); hold on;
+plot(t,motor_forces_hist(:,:),'g')
+xlabel("Time (s)");
+ylabel("Motor Force (N)");
+hold off;
+
+[t, var_dot] = ode45(@(t,x) QuadrotorEOM(t, x, targets, params, @PID_controller), tspan, init_cond, opt);
+% Post processing to regain control forces and motor forces
+num_steps = length(t);
+Zc_hist = zeros(num_steps, 1);
+Lc_hist = zeros(num_steps, 1);
+Mc_hist = zeros(num_steps, 1);
+Nc_hist = zeros(num_steps, 1);
+motor_forces_hist = zeros(num_steps, 4);
+
+errors = var_dot(:,13:18);
+var_dot = var_dot(:,1:12);
+
+for i = 1:num_steps
+    % Extract the 12x1 state vector at time step i
+    current_state = var_dot(i, :)'; 
+    current_t = t(i);
+    
+    % Call your controller exactly how it runs inside the EOM
+    forces = PID_controller(current_t, current_state, errors, targets, params);
+    motor_forces_hist(i, :) = forces';
+    
+    % Reconstruct the moments using your Forward Mixer Matrix
+    control_moments = ComputeMomentMatrix(forces, params.d, params.km);
+    
+    % Save them to your history arrays
+    Zc_hist(i) = control_moments(1);
+    Lc_hist(i) = control_moments(2);
+    Mc_hist(i) = control_moments(3);
+    Nc_hist(i) = control_moments(4);
+end
+% Consolidating
+control_input_array = [Zc_hist, Lc_hist, Mc_hist, Nc_hist];
+
+plot_tol = 6; % round to 8 decimals
+% Plotting
+PlotAircraftSim(t,round(var_dot,plot_tol),round(control_input_array,plot_tol),[1,2,3,4,5,6],'b-',0,'',"Test Hover PID")
+
+figure(7); hold on;
+plot(t,motor_forces_hist(:,:),'b')
+
 toc

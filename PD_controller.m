@@ -1,4 +1,4 @@
-function motor_forces = PD_controller(t, var, targets, params)
+function [motor_forces, phi_d, theta_d] = PD_controller(t, var, error_sum, targets, params)
 %{
     Function inputs current time and statevector, as well as targets for
     position and velocity, and parameters needed for calculations.
@@ -11,6 +11,7 @@ function motor_forces = PD_controller(t, var, targets, params)
     Inputs:
         t - time
         var - 12x1 state vector
+        error_sum - placeholder for generalized input to work
         targets - desired positions or velocities (will get from nav)
         params - necessary parameteres like km, d, m, g, etc.
     Outputs:
@@ -39,9 +40,6 @@ function motor_forces = PD_controller(t, var, targets, params)
     % May have switched signs
     phi_d = 1/params.g * (params.Kpy * (targets.y - y) + params.Kdy * (targets.v - y_dot));
     theta_d = -1/params.g * (params.Kpx * (targets.x - x) + params.Kdx * (targets.u - x_dot));
-
-    % phi_d = 0;
-    % theta_d = 0;
 
     % Calculate Vertical control
     Zc_temp = -(params.m * params.g) + params.Kpz*(targets.z-z) + params.Kdz*(targets.w-w);

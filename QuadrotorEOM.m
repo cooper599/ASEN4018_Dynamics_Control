@@ -36,6 +36,7 @@ p = var(10); q = var(11); r = var(12);
 % Separate Params
 % Weight
 g = params.g; m = params.m;
+% m = 1.2 * params.m;
 
 % Structural
 I = params.I; d = params.d; km = params.km;
@@ -43,12 +44,15 @@ I = params.I; d = params.d; km = params.km;
 % Flying
 nu = params.nu; mu = params.mu;
 
+% Error tracking for control systems with I terms
+error_sum = var(13:18); % track x,y,z, phi,theta,psi error
+
 % Calculate Motor Forces usiing specific control function
 % Pass in t and state vector to calculate gains within???
 % Use the motor forces to calculate actual control forces
 
 % Statevector -> motor forces -> calculate controls from limited motor forces
-motor_forces = controller_func(t, var, targets, params);
+[motor_forces, phi_d, theta_d] = controller_func(t, var, error_sum, targets, params);
 
 % Calculate Gamma Matrix for p,q,r dot
 GammaArr = calculateGammas(I);
@@ -92,6 +96,7 @@ airspeed = norm([u, v, w],2);
 aero_forces_matrix = -nu * airspeed * [u; v; w];
 
 vel_dot = angle_vel_matrix + g * grav_matrix + (1/m) * aero_forces_matrix + (1/m)*[0;0;Zc];
+% vel_dot(2) = vel_dot(2) + 5/m;
 
 % I(1,1) = Ixx, I(2,2) = Iyy, I(3,3) = Izz
 I_ang_rate_matrix = [GammaArr(1)*p*q-GammaArr(2)*q*r;...
@@ -108,6 +113,29 @@ control_moment_matrix = [Lc/I(1,1);...
 
 ang_rate_dot = I_ang_rate_matrix + Moment_Matrix + control_moment_matrix;
 
+err_x = targets.x - var(1);
+err_y = targets.y - var(2);
+err_z = targets.z - var(3);
+err_psi = targets.psi - var(6);
+
+% Returns phi_d and theta_d from function call
+err_phi = phi_d - var(4);
+err_theta = theta_d - var(5);
+
+error_dot = [err_x;err_y;err_z;err_phi;err_theta;err_psi];
+
+% Anti wind up protection
+max_limits = [params.max_int_x; params.max_int_y; params.max_int_z; ...
+                  params.max_int_phi; params.max_int_theta; params.max_int_psi];     
+    for i = 1:6
+        state_idx = 12 + i;
+        if (var(state_idx) >= max_limits(i) && error_dot(i) > 0)
+        error_dot(i) = 0;
+        elseif (var(state_idx) <= -max_limits(i) && error_dot(i) < 0)
+            error_dot(i) = 0;
+        end
+    end
+
 % Put together derivative state vector
-var_dot = [pos_dot; ang_dot; vel_dot; ang_rate_dot];
+var_dot = [pos_dot; ang_dot; vel_dot; ang_rate_dot; error_dot];
 end
