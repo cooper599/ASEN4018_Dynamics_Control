@@ -1,4 +1,5 @@
 %% SIMULINK INITIALIZATION SCRIPT
+clear all; close all; clc;
 % Constants, params, etc.
 g = 9.81; % m/s^2
 m = 5.6; % kg (max)
@@ -36,4 +37,52 @@ B = [0 0 0 0;
 C = eye(12);
 D = zeros(12,4);
 
-init_cond = []
+% init_cond = [0; 0; 0;  % x,y,z
+%              deg2rad(5); deg2rad(5); deg2rad(5);  % phi,theta,psi
+%              0; 0; 0;  % u,v,w
+%              0; 0; 0]; % p,q,r
+
+init_cond = [0; 0; 0;  % x,y,z
+             0; 0; 0;  % phi,theta,psi
+             0; 0; 0;  % u,v,w
+             0; 0; 0]; % p,q,r
+
+%% Control Gains
+% Vertical Gains
+% Kpz = 100.0;
+% Kiz = 40.0;
+% Kdz = 50.0; % w
+Kpz = 150.0;
+Kiz = 25.0;
+Kdz = 60.0;
+
+% Roll and Pitch gains
+Kpphi = 20.0;
+Kiphi = 5.0;
+Kdphi = 15.0; % p
+
+Kptheta = 20.0;
+Kitheta = 5.0;
+Kdtheta = 15.0; % q
+
+% Yaw gains
+Kppsi = 20.0;
+Kipsi = 5.0;
+Kdpsi = 15.0; % r
+
+% Outerloop gains
+Kpx = 0.25;
+Kpy = 0.25;
+
+% Velocity specific gains
+Kpu = 0.5;
+Kpv = 0.5;
+
+%% Navigation 
+t_path = [0; 5; 15; 25];         % Time stamps
+x_waypoints = [0; 2;  5;  5];    % X coordinates
+y_waypoints = [0; 0;  3; -2];    % Y coordinates
+
+% Format as a standard Simulink dataset
+X_data = timeseries(x_waypoints, t_path);
+Y_data = timeseries(y_waypoints, t_path);
