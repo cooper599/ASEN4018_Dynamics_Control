@@ -1,5 +1,5 @@
 %% SIMULINK INITIALIZATION SCRIPT
-clear all; close all; clc;
+% clear all; close all; clc;
 % Constants, params, etc.
 g = 9.81; % m/s^2
 m = 5.6; % kg (max)
@@ -75,6 +75,54 @@ Kpy = 0.25;
 Kpu = 1.0;
 Kpv = 1.0;
 
+%% Navigation 
+%% HELICAL TAKEOFF TRAJECTORY (NED Frame)
+t_sim = 0:0.01:40; % Run simulation for 40 seconds
+t_sim = t_sim(:);  % Force into column vector
+
+% Initialize empty command profiles
+x_data = zeros(length(t_sim), 1);
+y_data = zeros(length(t_sim), 1);
+z_data = zeros(length(t_sim), 1);
+psi_data = zeros(length(t_sim), 1); 
+
+%% Helical Parametrization
+% Parameters for the helix (0 to 20 seconds)
+t_takeoff = 20;               % Time duration of the helical takeoff
+radius = 2;                  % 2-meter radius spiral
+turns = 3;                    % Number of full 360-degree loops
+w = (2 * pi * turns) / t_takeoff; % Angular velocity (rad/s)
+max_altitude = -5;           % Target altitude (NED: Z = -5m is 5 meters up)
+
+% Logical mask for the takeoff phase
+takeoff_idx = (t_sim >= 0 & t_sim <= t_takeoff);
+
+%% Phase 1: Helical Takeoff (0 to 20s)
+% X and Y use sine/cosine to form the circle. 
+% Offset X by -radius so the quadrotor starts exactly at (0,0) instead of a jump.
+x_data(takeoff_idx) = radius * cos(w * t_sim(takeoff_idx)) - radius;
+y_data(takeoff_idx) = radius * sin(w * t_sim(takeoff_idx));
+
+% Z climbs linearly from 0 to max_altitude
+z_data(takeoff_idx) = (max_altitude / t_takeoff) * t_sim(takeoff_idx);
+
+% Optional: Point the nose (yaw) along the direction of travel
+psi_data(takeoff_idx) = w * t_sim(takeoff_idx) + pi/2; 
+
+%% Phase 2: Steady Hover at Apex (20s to end)
+hover_idx = (t_sim > t_takeoff);
+
+% Lock into the final position coordinates from the end of the helix
+x_data(hover_idx) = x_data(find(takeoff_idx, 1, 'last'));
+y_data(hover_idx) = y_data(find(takeoff_idx, 1, 'last'));
+z_data(hover_idx) = max_altitude;
+psi_data(hover_idx) = psi_data(find(takeoff_idx, 1, 'last'));
+
+%% Package the arrays for your Simulink "From Workspace" blocks
+X_data = [t_sim, x_data];
+Y_data = [t_sim, y_data];
+Z_data = [t_sim, z_data];
+psi_des = [t_sim, psi_data]; 
 
 %% Plotting
 % Extract data
@@ -98,42 +146,30 @@ set(gca,'YDir','reverse');
 set(gca,'ZDir','reverse');
 view(45,45)
 
-%% Navigation 
-%% MULTI-STEP WAYPOINT PROFILE TRAJECTORY
-t_sim = 0:0.01:40; % Run simulation for 40 seconds
-t_sim = t_sim(:);  % Force into column vector
+figure(); hold on; grid on;
+plot(t, state_hist(1:3,:), LineWidth=1.2)
+xlabel("Time [s]",FontSize=14);
+ylabel("Inertial Position [m]",FontSize=14);
+title("Inertial Position vs Time",FontSize=18);
+legend("x","y","z");
 
-% Initialize empty command profiles
-x_data = zeros(length(t_sim), 1);
-y_data = zeros(length(t_sim), 1);
-z_data = zeros(length(t_sim), 1);
-psi_data = zeros(length(t_sim), 1); % Keep heading flat at 0
+figure(); hold on; grid on;
+plot(t, state_hist(4:5,:), LineWidth=1.2)
+xlabel("Time [s]",FontSize=14);
+ylabel("Radians [rad]",FontSize=14);
+title("Euler Angles vs Time",FontSize=18);
+legend("phi","theta");%,"psi");
 
-%% Build the Waypoint Logic based on your time bounds
-% Phase 1 (0 to 5s): Climb straight up to 2 meters (NED: Z = -2)
-z_data(t_sim >= 0 & t_sim < 5)   = -2;
+figure(); hold on; grid on;
+plot(t, state_hist(7:9,:), LineWidth=1.2)
+xlabel("Time [s]",FontSize=14);
+ylabel("Velocity [m/s]",FontSize=14);
+title("Velocities vs Time",FontSize=18);
+legend("u","v","w");
 
-% Phase 2 (5 to 15s): Maintain 2m height, fly North 2 meters (NED: X = +2)
-z_data(t_sim >= 5 & t_sim < 15)  = -2;
-x_data(t_sim >= 5 & t_sim < 15)  = 2;
-
-% Phase 3 (15 to 25s): Maintain North 2m, fly East 2 meters (NED: Y = +2)
-z_data(t_sim >= 15 & t_sim < 25) = -2;
-x_data(t_sim >= 15 & t_sim < 25) = 2;
-y_data(t_sim >= 15 & t_sim < 25) = 2;
-
-% Phase 4 (25 to 35s): Keep North/East coordinates, return to ground (NED: Z = 0)
-z_data(t_sim >= 25 & t_sim < 35) = 0;
-x_data(t_sim >= 25 & t_sim < 35) = 2;
-y_data(t_sim >= 25 & t_sim < 35) = 2;
-
-% Phase 5 (35s to end): Stay on the ground at final destination
-z_data(t_sim >= 35) = 0;
-x_data(t_sim >= 35) = 2;
-y_data(t_sim >= 35) = 2;
-
-%% Package the arrays for your Simulink "From Workspace" blocks
-X_data = [t_sim, x_data];
-Y_data = [t_sim, y_data];
-Z_data = [t_sim, z_data];
-psi_des = [t_sim, psi_data]; % Wire this to your Yaw input if needed
+figure(); hold on; grid on;
+plot(t, state_hist(10:12,:), LineWidth=1.2)
+xlabel("Time [s]",FontSize=14);
+ylabel("Angular velocities [rad/s]",FontSize=14);
+title("Angular Velocities vs Time",FontSize=18);
+legend("p","q","r");
