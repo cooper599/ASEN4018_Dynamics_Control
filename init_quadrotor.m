@@ -47,6 +47,16 @@ init_cond = [0; 0; 0;  % x,y,z
              0; 0; 0;  % u,v,w
              0; 0; 0]; % p,q,r
 
+%Drag stuff
+CdAx = 0.02; %M^2
+CdAy = 0.022; %M^2
+CdAz = 0.065; %M^2
+
+dragCoeffVec = [CdAx;CdAy;CdAz]
+
+rho = 1.225; %kg/m^3
+
+
 %% Control Gains
 % Vertical Gains
 Kpz = 150.0;
@@ -123,53 +133,53 @@ X_data = [t_sim, x_data];
 Y_data = [t_sim, y_data];
 Z_data = [t_sim, z_data];
 psi_des = [t_sim, psi_data]; 
-
-%% Plotting
-% Extract data
-t = out.flight_history.Time;
-state_hist = out.flight_history.Data';
-
-figure(); grid on; hold on;
-scatter3(state_hist(1,:),state_hist(2,:),state_hist(3,:),30,t,"filled")
-% Create a colormap with 256 colors that goes from green to red.
-m = 256; % Number of Colours
-cMap = interp1([0;1], [0 1 0; 1 0 0], linspace(0,1,m)); % Start Green End Red
-colormap(cMap);
-cMap = colorbar;
-xlabel("X Position (North +) [m]",FontSize=14);
-ylabel("Y Position (East +) [m]",FontSize=14);
-zlabel("Z Position (Up -) [m]",FontSize=14);
-title("3D Visualization of Inertial Position",FontSize=18);
-cMap.Title.String = "Time [s]";
-zlim([-20 0])
-set(gca,'YDir','reverse');
-set(gca,'ZDir','reverse');
-view(45,45)
-
-figure(); hold on; grid on;
-plot(t, state_hist(1:3,:), LineWidth=1.2)
-xlabel("Time [s]",FontSize=14);
-ylabel("Inertial Position [m]",FontSize=14);
-title("Inertial Position vs Time",FontSize=18);
-legend("x","y","z");
-
-figure(); hold on; grid on;
-plot(t, state_hist(4:5,:), LineWidth=1.2)
-xlabel("Time [s]",FontSize=14);
-ylabel("Radians [rad]",FontSize=14);
-title("Euler Angles vs Time",FontSize=18);
-legend("phi","theta");%,"psi");
-
-figure(); hold on; grid on;
-plot(t, state_hist(7:9,:), LineWidth=1.2)
-xlabel("Time [s]",FontSize=14);
-ylabel("Velocity [m/s]",FontSize=14);
-title("Velocities vs Time",FontSize=18);
-legend("u","v","w");
-
-figure(); hold on; grid on;
-plot(t, state_hist(10:12,:), LineWidth=1.2)
-xlabel("Time [s]",FontSize=14);
-ylabel("Angular velocities [rad/s]",FontSize=14);
-title("Angular Velocities vs Time",FontSize=18);
-legend("p","q","r");
+% 
+% %% Plotting
+% % Extract data
+% t = out.flight_history.Time;
+% state_hist = out.flight_history.Data';
+% 
+% figure(); grid on; hold on;
+% scatter3(state_hist(1,:),state_hist(2,:),state_hist(3,:),30,t,"filled")
+% % Create a colormap with 256 colors that goes from green to red.
+% m = 256; % Number of Colours
+% cMap = interp1([0;1], [0 1 0; 1 0 0], linspace(0,1,m)); % Start Green End Red
+% colormap(cMap);
+% cMap = colorbar;
+% xlabel("X Position (North +) [m]",FontSize=14);
+% ylabel("Y Position (East +) [m]",FontSize=14);
+% zlabel("Z Position (Up -) [m]",FontSize=14);
+% title("3D Visualization of Inertial Position",FontSize=18);
+% cMap.Title.String = "Time [s]";
+% zlim([-20 0])
+% set(gca,'YDir','reverse');
+% set(gca,'ZDir','reverse');
+% view(45,45)
+% 
+% figure(); hold on; grid on;
+% plot(t, state_hist(1:3,:), LineWidth=1.2)
+% xlabel("Time [s]",FontSize=14);
+% ylabel("Inertial Position [m]",FontSize=14);
+% title("Inertial Position vs Time",FontSize=18);
+% legend("x","y","z");
+% 
+% figure(); hold on; grid on;
+% plot(t, state_hist(4:5,:), LineWidth=1.2)
+% xlabel("Time [s]",FontSize=14);
+% ylabel("Radians [rad]",FontSize=14);
+% title("Euler Angles vs Time",FontSize=18);
+% legend("phi","theta");%,"psi");
+% 
+% figure(); hold on; grid on;
+% plot(t, state_hist(7:9,:), LineWidth=1.2)
+% xlabel("Time [s]",FontSize=14);
+% ylabel("Velocity [m/s]",FontSize=14);
+% title("Velocities vs Time",FontSize=18);
+% legend("u","v","w");
+% 
+% figure(); hold on; grid on;
+% plot(t, state_hist(10:12,:), LineWidth=1.2)
+% xlabel("Time [s]",FontSize=14);
+% ylabel("Angular velocities [rad/s]",FontSize=14);
+% title("Angular Velocities vs Time",FontSize=18);
+% legend("p","q","r");
