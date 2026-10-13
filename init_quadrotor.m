@@ -48,13 +48,13 @@ init_cond = [0; 0; 0;  % x,y,z
              0; 0; 0]; % p,q,r
 
 %Drag stuff
-CdAx = 0.02; %M^2
-CdAy = 0.022; %M^2
-CdAz = 0.065; %M^2
+CdAx = 0.15; % m^2 (Accounts for a blockier frame and exposed arms)
+CdAy = 0.16; % m^2
+CdAz = 0.25; % m^2 (Top/bottom surface area catching air during vertical moves)
 
 dragCoeffVec = [CdAx;CdAy;CdAz]
 
-rho = 1.225; %kg/m^3
+rho = 1.225; %kg/m^3 sea level
 
 
 %% Control Gains
