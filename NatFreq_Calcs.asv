@@ -1,0 +1,16 @@
+%% REQ-Dyn-03
+% Finding natural frequencies and damping ratios
+clear all; close all; clc;
+
+stopping_times = [0.3,0.7];
+damping_ratios = [0.7,1.1];
+
+N = 1000;
+
+% Range of zeta
+xi = linspace(0.7,1.1,N);
+ts = linsapce(0.3,0.7,N);
+
+[TS, XI] = meshgrid(ts_vec, xi_vec);
+
+Omega_n_mid = 3.0 ./ (XI .* TS);
