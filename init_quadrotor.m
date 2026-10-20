@@ -78,14 +78,12 @@ Kpu = 0.5;
 Kpv = 0.5;
 
 %% Navigation 
-%% LAWNMOWER SEARCH TRAJECTORY (0.4 m/s Cruise, 5s Corner Pauses, Fixed Heading)
-clear x_seg y_seg z_seg psi_seg t_seg;
-
-%% 1. Grid Geometry & Kinematic Setup
+% LAWNMOWER SEARCH TRAJECTORY (0.4 m/s Cruise, 5s Corner Pauses, Fixed Heading)
+% 1. Grid Geometry & Kinematic Setup
 box_size = 5.0;        % 5x5 meter bounding area
 sep = 1.25;            % 1.25 meter horizontal leg separation
-target_altitude = -5;  % NED Frame: Z = -5m is 5 meters up
-cruise_speed = 0.4;    % Locked velocity profile (m/s)
+target_altitude = -1.8; % NED Frame: 90% of 2m upward is Z = -1.8m
+cruise_speed = 0.4;    % Locked velocity profile (m/s) for both Horiz & Vert
 accel = 0.4;           % Acceleration / Deceleration rate (m/s^2)
 pause_time = 5.0;      % Pause duration at corners (seconds)
 
@@ -105,91 +103,103 @@ WP = [ ...
 
 num_wp = size(WP, 1);
 
-%% 2. Calculate Exact Kinematic Profiles for Each Segment
-% Time required to accelerate to cruise speed and decelerate to a stop:
+% 2. Calculate Exact Kinematic Profiles for Each Segment
 t_acc = cruise_speed / accel; 
 d_acc = 0.5 * accel * t_acc^2; % Distance covered during acceleration/deceleration
 
-% We will build a continuous timeline of events
-segment_end_times = zeros(num_wp - 1, 1);
 current_time = 0;
-
-% Cell arrays to hold the generated trajectory chunks
-x_chunks = {};
-y_chunks = {};
-z_chunks = {};
-t_chunks = {};
-
-dt = 0.01; % Time step matching your 100Hz loop
+x_chunks = {}; y_chunks = {}; z_chunks = {}; t_chunks = {};
+dt = 0.01; % 100Hz timeline matching Pixhawk loop
 
 for i = 1:(num_wp - 1)
     p1 = WP(i, :);
     p2 = WP(i+1, :);
     
     if i == 1
-        %% Initial Segment: Vertical Takeoff straight up (0 to 5m altitude)
-        t_climb = 5.0; % Dedicate 5 seconds to vertical climb
-        t_vec = current_time : dt : (current_time + t_climb);
+        % Phase 1: Trapezoidal Vertical Takeoff Climb up to 1.8m
+        d_total_z = abs(target_altitude);
         
-        x_chunks{i} = p1(1) * ones(size(t_vec));
-        y_chunks{i} = p1(2) * ones(size(t_vec));
-        z_chunks{i} = (target_altitude / t_climb) * (t_vec - current_time);
-        t_chunks{i} = t_vec;
+        if d_total_z >= (2 * d_acc)
+            d_cruise_z = d_total_z - (2 * d_acc);
+            t_cruise_z = d_cruise_z / cruise_speed;
+            t_climb_total = (2 * t_acc) + t_cruise_z;
+        else
+            % Fallback for short profiles if they never hit full cruise
+            t_acc_short = sqrt(d_total_z / accel);
+            t_climb_total = 2 * t_acc_short;
+            t_acc = t_acc_short;
+            t_cruise_z = 0;
+        end
         
-        current_time = current_time + t_climb;
+        % Build time arrays for takeoff segment
+        t_move_z = 0 : dt : t_climb_total;
+        t_pause_z = (t_climb_total + dt) : dt : (t_climb_total + pause_time);
+        t_takeoff = [t_move_z, t_pause_z];
+        
+        z_leg = zeros(size(t_takeoff));
+        
+        for k = 1:length(t_takeoff)
+            tk = t_takeoff(k);
+            if tk <= t_acc
+                dist_z = 0.5 * accel * tk^2;
+            elseif tk <= (t_acc + t_cruise_z)
+                dist_z = d_acc + cruise_speed * (tk - t_acc);
+            elseif tk <= t_climb_total
+                t_dec = tk - t_acc - t_cruise_z;
+                dist_z = d_total_z - (0.5 * accel * (t_acc - t_dec)^2);
+            else
+                dist_z = d_total_z;
+            end
+            z_leg(k) = -dist_z;
+        end
+        
+        t_chunks{i} = t_takeoff + current_time;
+        x_chunks{i} = p1(1) * ones(size(t_takeoff));
+        y_chunks{i} = p1(2) * ones(size(t_takeoff));
+        z_chunks{i} = z_leg;
+        
+        current_time = current_time + t_climb_total + pause_time;
     else
-        %% Horizontal Grid Segments (Includes Trapezoidal Velocity Profile + 5s Pause)
+        % Phase 2: Horizontal Grid Segments (Trapezoidal + 5s Pause)
         d_total = norm(p2 - p1);
         direction = (p2 - p1) / d_total;
         
-        % Calculate trapezoidal velocity profile times
         if d_total >= (2 * d_acc)
-            % Normal profile: reaches full cruise speed
             d_cruise = d_total - (2 * d_acc);
             t_cruise = d_cruise / cruise_speed;
             t_move_total = (2 * t_acc) + t_cruise;
         else
-            % Short segment profile: triangle velocity curve (never hits max cruise)
             t_acc_short = sqrt(d_total / accel);
             t_move_total = 2 * t_acc_short;
             t_acc = t_acc_short;
             t_cruise = 0;
         end
         
-        % Build the time vectors for this specific leg execution
         t_move = 0 : dt : t_move_total;
         t_pause = (t_move_total + dt) : dt : (t_move_total + pause_time);
         t_leg = [t_move, t_pause];
         
-        % Initialize segment coordinate arrays
         x_leg = zeros(size(t_leg));
         y_leg = zeros(size(t_leg));
         
-        % Compute trapezoidal position tracking over time
         for k = 1:length(t_leg)
             tk = t_leg(k);
             if tk <= t_acc
-                % Acceleration Phase
                 dist = 0.5 * accel * tk^2;
             elseif tk <= (t_acc + t_cruise)
-                % Constant Cruise Phase (0.4 m/s)
                 dist = d_acc + cruise_speed * (tk - t_acc);
             elseif tk <= t_move_total
-                % Deceleration Phase down to 0 m/s
                 t_dec = tk - t_acc - t_cruise;
                 dist = d_total - (0.5 * accel * (t_acc - t_dec)^2);
             else
-                % 5-Second Corner Stop Phase
                 dist = d_total;
             end
             
-            % Project the scalar distance onto the 2D plane geometry
             pos_2d = p1 + dist * direction;
             x_leg(k) = pos_2d(1);
             y_leg(k) = pos_2d(2);
         end
         
-        % Store the completed chunk with global timestamps applied
         t_chunks{i} = t_leg + current_time;
         x_chunks{i} = x_leg;
         y_chunks{i} = y_leg;
@@ -199,8 +209,7 @@ for i = 1:(num_wp - 1)
     end
 end
 
-%% 3. Combine Chunks and Package for Simulink
-% Stitch the individual waypoint trajectories into seamless global arrays
+% 3. Combine Chunks and Package for Simulink
 t_sim = unique(cat(2, t_chunks{:})');
 x_data = zeros(size(t_sim));
 y_data = zeros(size(t_sim));
@@ -213,7 +222,7 @@ for i = 1:length(t_chunks)
     z_data(idx) = z_chunks{i};
 end
 
-% Lock Yaw at 0: Forces translational tracking using pure pitch and roll
+% Keep Yaw locked at 0 so movement relies entirely on pitch and roll dynamics
 psi_data = zeros(length(t_sim), 1); 
 
 X_data = [t_sim, x_data];
@@ -226,6 +235,7 @@ psi_des = [t_sim, psi_data];
 t = out.flight_history.Time;
 state_hist = out.flight_history.Data';
 
+% 3D plot
 figure(); grid on; hold on;
 scatter3(state_hist(1,:),state_hist(2,:),state_hist(3,:),30,t,"filled")
 % Create a colormap with 256 colors that goes from green to red.
@@ -243,27 +253,38 @@ set(gca,'YDir','reverse');
 set(gca,'ZDir','reverse');
 view(45,45)
 
+% Position (x,y,z)
 figure(); hold on; grid on;
 plot(t, state_hist(1:3,:), LineWidth=1.2)
 xlabel("Time [s]",FontSize=14);
 ylabel("Inertial Position [m]",FontSize=14);
+yline(-1.8,'--r') % Desired z height (90% of 2m to account for 10% overshoot error)
 title("Inertial Position vs Time",FontSize=18);
-legend("x","y","z");
+legend("x","y","z","Desired z");
 
+% Euler Angles
 figure(); hold on; grid on;
 plot(t, state_hist(4:5,:), LineWidth=1.2)
 xlabel("Time [s]",FontSize=14);
 ylabel("Radians [rad]",FontSize=14);
+% Upper/Lower Bound limits  on roll angles set to 25 degrees
+% yline(deg2rad(25),'--r')
+% yline(-deg2rad(25),'--r')
 title("Euler Angles vs Time",FontSize=18);
-legend("phi","theta");%,"psi");
+legend("phi","theta");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
 
+% Linear Velocities
 figure(); hold on; grid on;
 plot(t, state_hist(7:9,:), LineWidth=1.2)
 xlabel("Time [s]",FontSize=14);
 ylabel("Velocity [m/s]",FontSize=14);
+% Velocity limits
+yline(0.5,'--r')
+yline(-0.5,'--r')
 title("Velocities vs Time",FontSize=18);
-legend("u","v","w");
+legend("u","v","w","Upper/Lower Bounds on Velocity");
 
+% Angular Velocities
 figure(); hold on; grid on;
 plot(t, state_hist(10:12,:), LineWidth=1.2)
 xlabel("Time [s]",FontSize=14);
