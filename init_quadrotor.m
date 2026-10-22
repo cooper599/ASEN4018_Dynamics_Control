@@ -51,31 +51,34 @@ init_cond = [0; 0; 0;  % x,y,z
 
 %% Control Gains
 % Vertical Gains
-Kpz = 150.0;
-Kiz = 0.5;
-Kdz = 60.0; % W
+% Kpz = 150.0;
+% Kiz = 0.5;
+% Kdz = 60.0; % W
+Kpz = 10.80567;
+Kiz = 1.08057;
+Kdz = 6.13958; % W
 
 % Roll and Pitch gains
-Kpphi = 20.0;
-Kiphi = 5.0;
-Kdphi = 15.0; % p
+Kpphi = 24.48955;
+Kiphi = 2.44895;
+Kdphi = 0.92686; % p
 
-Kptheta = 20.0;
-Kitheta = 5.0;
-Kdtheta = 15.0; % q
+Kptheta = 14.58697;
+Kitheta = 1.45870;
+Kdtheta = 0.55207; % q
 
 % Yaw gains
-Kppsi = 20.0;
-Kipsi = 5.0;
-Kdpsi = 15.0; % r
-
-% Outerloop gains
-Kpx = 0.25;
-Kpy = 0.25;
+Kppsi = 0.16519;
+Kipsi = 0.01652;
+Kdpsi = 0.05506; % r
 
 % Velocity specific gains
-Kpu = 0.5;
-Kpv = 0.5;
+Kpu = 0.81125;
+Kpv = 0.81125;
+
+% Outerloop gains
+Kpx = 0.39792;
+Kpy = 0.39792;
 
 %% Navigation 
 % LAWNMOWER SEARCH TRAJECTORY (0.4 m/s Cruise, 5s Corner Pauses, Fixed Heading)
