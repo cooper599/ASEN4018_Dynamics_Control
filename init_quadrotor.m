@@ -54,9 +54,10 @@ init_cond = [0; 0; 0;  % x,y,z
 % Kpz = 150.0;
 % Kiz = 0.5;
 % Kdz = 60.0; % W
-Kpz = 10.80567;
-Kiz = 1.08057;
-Kdz = 6.13958; % W
+Kpz = 13.80865;
+Kiz = 0.0;
+% Kiz = Kpz / 1000;
+Kdz = 8.4609; % W
 
 % Roll and Pitch gains
 Kpphi = 24.48955;
@@ -68,9 +69,9 @@ Kitheta = 1.45870;
 Kdtheta = 0.55207; % q
 
 % Yaw gains
-Kppsi = 0.16519;
-Kipsi = 0.01652;
-Kdpsi = 0.05506; % r
+Kppsi = 7.26562;
+Kipsi = 0.72656;
+Kdpsi = 0.36518; % r
 
 % Velocity specific gains
 Kpu = 0.81125;
@@ -80,39 +81,96 @@ Kpv = 0.81125;
 Kpx = 0.39792;
 Kpy = 0.39792;
 
-%% Navigation 
-% LAWNMOWER SEARCH TRAJECTORY (0.4 m/s Cruise, 5s Corner Pauses, Fixed Heading)
-% 1. Grid Geometry & Kinematic Setup
-box_size = 5.0;        % 5x5 meter bounding area
-sep = 1.25;            % 1.25 meter horizontal leg separation
-target_altitude = -1.8; % NED Frame: 90% of 2m upward is Z = -1.8m
-cruise_speed = 0.4;    % Locked velocity profile (m/s) for both Horiz & Vert
-accel = 0.4;           % Acceleration / Deceleration rate (m/s^2)
-pause_time = 5.0;      % Pause duration at corners (seconds)
+%% Navigation (High-Fidelity Inset Lawnmower Generation & Kinematic Profile)
+% 1. Grid Geometry, Camera Specs, and Kinematic Setup
+p.areaWidth = 5;              % [m]
+p.areaLength = 5;             % [m]
+p.altitude = 2.0;             % [m]
+p.vCruise = 0.40;             % [m/s]
+p.g = 9.81;                   % [m/s^2]
 
-% Define the geometric vertices of the lawnmower pattern
-WP = [ ...
-    0.00,  0.00;   % WP1: Start Corner (Ground)
-    0.00,  0.00;   % WP2: At Altitude (After initial climb)
-    0.00,  5.00;   % WP3: End of Leg 1
-    1.25,  5.00;   % WP4: End of Transition 1
-    1.25,  0.00;   % WP5: End of Leg 2
-    2.50,  0.00;   % WP6: End of Transition 2
-    2.50,  5.00;   % WP7: End of Leg 3
-    3.75,  5.00;   % WP8: End of Transition 3
-    3.75,  0.00;   % WP9: End of Leg 4
-    5.00,  0.00;   % WP10: End of Transition 4
-    5.00,  5.00];  % WP11: Final Destination Corner
+% Path-following assumptions matching your requirements
+p.accel = 0.25;               % [m/s^2]
+p.cornerHold = 5.0;           % [s] (Locked 5-second corner hold)
+p.overlap = 0.20;             % [-]
+p.posErrorStd = 0.05;         % [m]
+p.attitudeJitterStd = 1.0;    % [deg]
+p.dt = 0.01;                  % [s]
 
+% Camera Settings & Image Resolution
+p.imageResolution = [3264, 2448]; % [px]
+p.hFOV = 60;                  % [deg]
+p.vFOV = 2*atand((p.imageResolution(2)/p.imageResolution(1))*tand(p.hFOV/2));
+
+% Marker & Launch Coordinates
+p.markerSize = 0.08;          % [m]
+launchPoint = [-2, 0];        % [m]
+
+% Compute Footprint and Error Margins
+fp.width = 2*p.altitude*tand(p.hFOV/2);
+fp.length = 2*p.altitude*tand(p.vFOV/2);
+crossTrackMargin = 3*p.posErrorStd + p.altitude*tand(3*p.attitudeJitterStd);
+alongTrackMargin = crossTrackMargin + p.altitude*(p.accel/p.g);
+
+% Generate Inset Waypoints dynamically using your geometry formulas
+half = p.markerSize/2;
+halfWidth = fp.width/2 - half - crossTrackMargin;
+halfLength = fp.length/2 - half - alongTrackMargin;
+
+if halfWidth <= 0 || halfLength <= 0
+    error("Error margins exceed the camera footprint")
+end
+
+span = p.areaWidth - 2*half;
+trackSpacing = 2*halfWidth*(1 - p.overlap);
+nTracks = max(1, ceil((span - 2*halfWidth)/trackSpacing) + 1);
+
+if nTracks == 1
+    xlines = p.areaWidth/2;
+else
+    xlines = linspace(half + halfWidth, p.areaWidth - half - halfWidth, nTracks);
+end
+
+yLow = min(half + halfLength, p.areaLength/2);
+yHigh = max(p.areaLength - half - halfLength, p.areaLength/2);
+
+wpDR2 = [];
+for i = 1:nTracks
+    if mod(i,2) == 1
+        ys = [yLow, yHigh];
+    else
+        ys = [yHigh, yLow];
+    end
+    wpDR2 = [wpDR2; xlines(i), ys(1); xlines(i), ys(2)];
+end
+
+entryPoint = min(max(launchPoint, [0 0]), [p.areaWidth p.areaLength]);
+wpDR2 = [entryPoint; wpDR2];
+
+lastPoint = wpDR2(end,:);
+edges = [0, p.areaWidth, 0, p.areaLength];
+[~, k] = min(abs(lastPoint([1 1 2 2]) - edges));
+exitPoint = lastPoint;
+exitPoint(ceil(k/2)) = edges(k);
+wpDR2 = [wpDR2; exitPoint];
+
+% Format into the operational trajectory WP matrix
+% Double-up the first vertex to separate the takeoff phase from leg tracking
+WP = [wpDR2(1,1), wpDR2(1,2); wpDR2]; 
 num_wp = size(WP, 1);
 
-% 2. Calculate Exact Kinematic Profiles for Each Segment
+% Configure Kinematic Profile Constraints
+target_altitude = -2; % NED Frame: 90% of 2m upward is Z = -1.8m
+cruise_speed = p.vCruise;
+accel = p.accel;
+pause_time = p.cornerHold;
+dt = p.dt;
+
 t_acc = cruise_speed / accel; 
-d_acc = 0.5 * accel * t_acc^2; % Distance covered during acceleration/deceleration
+d_acc = 0.5 * accel * t_acc^2;
 
 current_time = 0;
 x_chunks = {}; y_chunks = {}; z_chunks = {}; t_chunks = {};
-dt = 0.01; % 100Hz timeline matching Pixhawk loop
 
 for i = 1:(num_wp - 1)
     p1 = WP(i, :);
@@ -127,20 +185,17 @@ for i = 1:(num_wp - 1)
             t_cruise_z = d_cruise_z / cruise_speed;
             t_climb_total = (2 * t_acc) + t_cruise_z;
         else
-            % Fallback for short profiles if they never hit full cruise
             t_acc_short = sqrt(d_total_z / accel);
             t_climb_total = 2 * t_acc_short;
             t_acc = t_acc_short;
             t_cruise_z = 0;
         end
         
-        % Build time arrays for takeoff segment
         t_move_z = 0 : dt : t_climb_total;
         t_pause_z = (t_climb_total + dt) : dt : (t_climb_total + pause_time);
         t_takeoff = [t_move_z, t_pause_z];
         
         z_leg = zeros(size(t_takeoff));
-        
         for k = 1:length(t_takeoff)
             tk = t_takeoff(k);
             if tk <= t_acc
@@ -163,7 +218,8 @@ for i = 1:(num_wp - 1)
         
         current_time = current_time + t_climb_total + pause_time;
     else
-        % Phase 2: Horizontal Grid Segments (Trapezoidal + 5s Pause)
+        % Phase 2: Horizontal Inset Grid Segments (Trapezoidal + 5s Pause)
+        % --- Inside Phase 2: Horizontal Inset Grid Segments ---
         d_total = norm(p2 - p1);
         direction = (p2 - p1) / d_total;
         
@@ -203,12 +259,15 @@ for i = 1:(num_wp - 1)
             y_leg(k) = pos_2d(2);
         end
         
-        t_chunks{i} = t_leg + current_time;
+        % FIX: Add dt to the baseline timeline to prevent boundary coordinate overwriting
+        t_chunks{i} = t_leg + current_time + dt;
         x_chunks{i} = x_leg;
         y_chunks{i} = y_leg;
         z_chunks{i} = target_altitude * ones(size(t_leg));
         
-        current_time = current_time + t_move_total + pause_time;
+        % Increment current_time cleanly by appending the dt separation
+        current_time = current_time + t_move_total + pause_time + dt;
+
     end
 end
 
@@ -254,27 +313,27 @@ cMap.Title.String = "Time [s]";
 zlim([-20 0])
 set(gca,'YDir','reverse');
 set(gca,'ZDir','reverse');
-view(45,45)
+view(215,45)
 
 % Position (x,y,z)
 figure(); hold on; grid on;
 plot(t, state_hist(1:3,:), LineWidth=1.2)
 xlabel("Time [s]",FontSize=14);
 ylabel("Inertial Position [m]",FontSize=14);
-yline(-1.8,'--r') % Desired z height (90% of 2m to account for 10% overshoot error)
+yline(-2.0,'--r') % Desired z height (90% of 2m to account for 10% overshoot error)
 title("Inertial Position vs Time",FontSize=18);
 legend("x","y","z","Desired z");
 
 % Euler Angles
 figure(); hold on; grid on;
-plot(t, state_hist(4:5,:), LineWidth=1.2)
+plot(t, state_hist(4:6,:), LineWidth=1.2)
 xlabel("Time [s]",FontSize=14);
 ylabel("Radians [rad]",FontSize=14);
 % Upper/Lower Bound limits  on roll angles set to 25 degrees
 % yline(deg2rad(25),'--r')
 % yline(-deg2rad(25),'--r')
 title("Euler Angles vs Time",FontSize=18);
-legend("phi","theta");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
+legend("phi","theta","psi");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
 
 % Linear Velocities
 figure(); hold on; grid on;

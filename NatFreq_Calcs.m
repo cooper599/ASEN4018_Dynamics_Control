@@ -3,6 +3,7 @@
 clear all; close all; clc;
 
 N = 100;
+g = 9.81; % m/s^2
 
 % Range of damping ratios and settling times
 zeta = linspace(0.7,1.1,N);
@@ -125,15 +126,35 @@ Kdtheta = Kd_mult / J_inv(2,2);
 Kitheta = Kptheta * 0.1;          
 
 %% 2. Inner Loop: Yaw and Vertical (Bypasses Cascade Layering)
-wn_yaw = 6.0; zeta_yaw = 1.0;
-Kppsi = (wn_yaw^2) / J_inv(3,3);  
-Kdpsi = (2 * zeta_yaw * wn_yaw) / J_inv(3,3); 
-Kipsi = Kppsi * 0.1;
+% wn_yaw = 6.0; zeta_yaw = 1.0;
+% Kppsi = (wn_yaw^2) / J_inv(3,3);  
+% Kdpsi = (2 * zeta_yaw * wn_yaw) / J_inv(3,3); 
+% Kipsi = Kppsi * 0.1;
+% 
+% wn_z = 3.52; zeta_z = 1.0; 
+% Kpz = (wn_z^2) * m;               
+% Kdz = (2 * zeta_z * wn_z) * m;     
+% Kiz = Kpz * 0.1;
 
-wn_z = 3.52; zeta_z = 1.0; 
+zeta_z = 1.0; % critically damped
+wn_z = wn_inner / 10;
 Kpz = (wn_z^2) * m;               
 Kdz = (2 * zeta_z * wn_z) * m;     
 Kiz = Kpz * 0.1;
+
+Jzz = 1 / J_inv(3,3);
+Jxx = 1 / J_inv(1,1);
+Jyy = 1 / J_inv(2,2);
+mean_translational_inertia = (Jxx + Jyy) / 2;
+% wn_attitude_base = 15.0;
+% yaw_inertia_penalty = min(1.0, mean_translational_inertia / Jzz);
+% wn_yaw = wn_attitude_base * 0.4 * yaw_inertia_penalty; 
+
+wn_yaw = wn_inner;
+zeta_yaw = 1.0;
+Kppsi = (wn_yaw^2) / J_inv(3,3);  
+Kdpsi = (2 * zeta_yaw * wn_yaw) / J_inv(3,3); 
+Kipsi = Kppsi * 0.1;
 
 %% 3. Mid Loop: Translational Velocity Gains (u, v)
 wn_mid = wn_inner / 10.0; 
