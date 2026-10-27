@@ -200,25 +200,36 @@ for i = 1:(num_wp - 1)
         t_takeoff = [t_move_z, t_pause_z];
         
         z_leg = zeros(size(t_takeoff));
+        vz_leg = zeros(size(t_takeoff)); % --- ADDED ---
+
         for k = 1:length(t_takeoff)
             tk = t_takeoff(k);
             if tk <= t_acc
                 dist_z = 0.5 * accel * tk^2;
+                vel_z = accel * tk; % --- ADDED ---
             elseif tk <= (t_acc + t_cruise_z)
                 dist_z = d_acc + cruise_speed * (tk - t_acc);
+                vel_z = cruise_speed; % --- ADDED ---
             elseif tk <= t_climb_total
                 t_dec = tk - t_acc - t_cruise_z;
                 dist_z = d_total_z - (0.5 * accel * (t_acc - t_dec)^2);
+                vel_z = cruise_speed - (accel * t_dec); % --- ADDED ---
             else
                 dist_z = d_total_z;
+                vel_z = 0; % --- ADDED ---
             end
             z_leg(k) = -dist_z;
+            vz_leg(k) = -vel_z; % --- ADDED --- (Negative for upward velocity in NED)
         end
         
         t_chunks{i} = t_takeoff + current_time;
         x_chunks{i} = p1(1) * ones(size(t_takeoff));
         y_chunks{i} = p1(2) * ones(size(t_takeoff));
         z_chunks{i} = z_leg;
+
+        vx_chunks{i} = zeros(size(t_takeoff));
+        vy_chunks{i} = zeros(size(t_takeoff));
+        vz_chunks{i} = vz_leg;
         
         current_time = current_time + t_climb_total + pause_time;
     else
@@ -244,18 +255,23 @@ for i = 1:(num_wp - 1)
         
         x_leg = zeros(size(t_leg));
         y_leg = zeros(size(t_leg));
+        v_mag = zeros(size(t_leg)); 
         
         for k = 1:length(t_leg)
             tk = t_leg(k);
             if tk <= t_acc
                 dist = 0.5 * accel * tk^2;
+                v_mag(k) = accel * tk; % --- ADDED ---
             elseif tk <= (t_acc + t_cruise)
                 dist = d_acc + cruise_speed * (tk - t_acc);
+                 v_mag(k) = cruise_speed; % --- ADDED ---
             elseif tk <= t_move_total
                 t_dec = tk - t_acc - t_cruise;
                 dist = d_total - (0.5 * accel * (t_acc - t_dec)^2);
+                v_mag(k) = cruise_speed - (accel * t_dec); % --- ADDED ---
             else
                 dist = d_total;
+                v_mag(k) = 0; % --- ADDED ---
             end
             
             pos_2d = p1 + dist * direction;
@@ -268,6 +284,10 @@ for i = 1:(num_wp - 1)
         x_chunks{i} = x_leg;
         y_chunks{i} = y_leg;
         z_chunks{i} = target_altitude * ones(size(t_leg));
+
+        vx_chunks{i} = v_mag * direction(1);
+        vy_chunks{i} = v_mag * direction(2);
+        vz_chunks{i} = zeros(size(t_leg));
         
         % Increment current_time cleanly by appending the dt separation
         current_time = current_time + t_move_total + pause_time + dt;
@@ -276,17 +296,24 @@ for i = 1:(num_wp - 1)
 end
 
 % 3. Combine Chunks and Package for Simulink
-% 3. Combine Chunks and Package for Simulink
 t_sim = unique(cat(2, t_chunks{:})');
 x_data = zeros(size(t_sim));
 y_data = zeros(size(t_sim));
 z_data = zeros(size(t_sim));
+
+vx_data = zeros(size(t_sim));
+vy_data = zeros(size(t_sim));
+vz_data = zeros(size(t_sim));
 
 for i = 1:length(t_chunks)
     [~, idx] = intersect(t_sim, t_chunks{i}');
     x_data(idx) = x_chunks{i};
     y_data(idx) = y_chunks{i};
     z_data(idx) = z_chunks{i};
+    
+    vx_data(idx) = vx_chunks{i};
+    vy_data(idx) = vy_chunks{i};
+    vz_data(idx) = vz_chunks{i};
 end
 
 % Keep Yaw locked at 0 so movement relies entirely on pitch and roll dynamics
@@ -297,6 +324,10 @@ X_data   = [t_sim, x_data];
 Y_data   = [t_sim, y_data];
 Z_data   = [t_sim, z_data];
 psi_des = [t_sim, psi_data];
+
+Vx_data   = [t_sim, vx_data];
+Vy_data   = [t_sim, vy_data];
+Vz_data   = [t_sim, vz_data];
 
 %% Plotting
 % Extract data
@@ -366,3 +397,51 @@ xlabel("Time [s]",FontSize=14);
 ylabel("Angular velocities [rad/s]",FontSize=14);
 title("Angular Velocities vs Time",FontSize=18);
 legend("p","q","r");
+
+%% Position Error Analysis for Localization Team
+% 1. Resample Desired Trajectory to Match Actual Simulation Time (t)
+x_des_interp = interp1(t_sim, x_data, t, 'linear', 'extrap');
+y_des_interp = interp1(t_sim, y_data, t, 'linear', 'extrap');
+z_des_interp = interp1(t_sim, z_data, t, 'linear', 'extrap');
+
+% 2. Calculate Tracking Error (Error = Desired - Actual)
+% In control engineering, a positive error means the drone is lagging behind the target
+error_x = x_des_interp - state_hist(1,:)';
+error_y = y_des_interp - state_hist(2,:)';
+error_z = z_des_interp - state_hist(3,:)'; % Up direction
+
+% 3. Calculate 3D Euclidean Tracking Error Magnitude
+error_3d_mag = sqrt(error_x.^2 + error_y.^2 + error_z.^2);
+
+% 4. Generate the Position Error Timeline Plot
+figure(); hold on; grid on;
+plot(t, error_x, 'Color', [0 0.4470 0.7410], 'LineWidth', 1.5); % Blue
+plot(t, error_y, 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5); % Orange
+plot(t, error_z, 'Color', [0.9290 0.6940 0.1250], 'LineWidth', 1.5); % Yellow
+plot(t, error_3d_mag, ':k', 'LineWidth', 1.2); % Dashed Black for Magnitude
+
+% Reference bounds matching your path requirements
+yline(p.posErrorStd*2, '--r', 'LineWidth', 1.0);
+yline(-p.posErrorStd*2, '--r', 'LineWidth', 1.0);
+
+xlabel("Time [s]", 'FontSize', 14);
+ylabel("Position Error [m]", 'FontSize', 14);
+title("Inertial Position Tracking Error vs Time", 'FontSize', 18);
+
+legend("X Error (North)", "Y Error (East)", "Z Error (Up)", ...
+       "Total 3D Error Magnitude", "Allowed 2\sigma Bounds (\pm0.05m)", ...
+       'Location', 'best');
+
+% 5. Print Descriptive Statistical Summary to Command Window for the Team
+fprintf('\n==================================================\n');
+fprintf('        LOCALIZATION TEAM METRICS SUMMARY         \n');
+fprintf('==================================================\n');
+fprintf('Maximum X Error (North):    %8.4f m\n', max(abs(error_x)));
+fprintf('Maximum Y Error (East):     %8.4f m\n', max(abs(error_y)));
+fprintf('Maximum Z Error (Altitude): %8.4f m\n', max(abs(error_z)));
+fprintf('--------------------------------------------------\n');
+fprintf('RMS X Error:               %8.4f m\n', rms(error_x));
+fprintf('RMS Y Error:               %8.4f m\n', rms(error_y));
+fprintf('RMS Z Error:               %8.4f m\n', rms(error_z));
+fprintf('Peak Total 3D Deviation:    %8.4f m\n', max(error_3d_mag));
+fprintf('==================================================\n');
