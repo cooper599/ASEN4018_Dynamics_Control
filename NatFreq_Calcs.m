@@ -157,7 +157,8 @@ Kdpsi = (2 * zeta_yaw * wn_yaw) / J_inv(3,3);
 Kipsi = Kppsi * 0.1;
 
 %% 3. Mid Loop: Translational Velocity Gains (u, v)
-wn_mid = wn_inner / 10.0; 
+% wn_mid = wn_inner / 10.0; 
+wn_mid = wn_inner / 5.0;
 zeta_mid = 1.0; 
 
 Kpu = (2 * zeta_mid * wn_mid) / g; 
@@ -168,7 +169,8 @@ Kiu = Kpu * 0.1;
 Kiv = Kiu;
 
 %% 4. Outer Loop: Spatial Position Gains (x, y)
-wn_outer = wn_mid / 10.0; 
+% wn_outer = wn_mid / 10.0; 
+wn_outer = wn_mid / 5.0;
 
 Kpx = wn_outer;                    
 Kpy = Kpx;

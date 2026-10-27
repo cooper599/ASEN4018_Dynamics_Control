@@ -74,12 +74,16 @@ Kipsi = 0.72656;
 Kdpsi = 0.36518; % r
 
 % Velocity specific gains
-Kpu = 0.81125;
-Kpv = 0.81125;
+% Kpu = 0.81125;
+% Kpv = 0.81125;
+Kpu = 1.62250;
+Kpv = 1.62250;
 
 % Outerloop gains
-Kpx = 0.39792;
-Kpy = 0.39792;
+% Kpx = 0.39792;
+% Kpy = 0.39792;
+Kpx = 1.59167;
+Kpy = 1.59167;
 
 %% Navigation (High-Fidelity Inset Lawnmower Generation & Kinematic Profile)
 % 1. Grid Geometry, Camera Specs, and Kinematic Setup
@@ -90,7 +94,7 @@ p.vCruise = 0.40;             % [m/s]
 p.g = 9.81;                   % [m/s^2]
 
 % Path-following assumptions matching your requirements
-p.accel = 0.25;               % [m/s^2]
+p.accel = 0.50;               % [m/s^2]
 p.cornerHold = 5.0;           % [s] (Locked 5-second corner hold)
 p.overlap = 0.20;             % [-]
 p.posErrorStd = 0.05;         % [m]
@@ -272,6 +276,7 @@ for i = 1:(num_wp - 1)
 end
 
 % 3. Combine Chunks and Package for Simulink
+% 3. Combine Chunks and Package for Simulink
 t_sim = unique(cat(2, t_chunks{:})');
 x_data = zeros(size(t_sim));
 y_data = zeros(size(t_sim));
@@ -287,9 +292,10 @@ end
 % Keep Yaw locked at 0 so movement relies entirely on pitch and roll dynamics
 psi_data = zeros(length(t_sim), 1); 
 
-X_data = [t_sim, x_data];
-Y_data = [t_sim, y_data];
-Z_data = [t_sim, z_data];
+% Clean time-series matrices ready for From-Workspace blocks in Simulink
+X_data   = [t_sim, x_data];
+Y_data   = [t_sim, y_data];
+Z_data   = [t_sim, z_data];
 psi_des = [t_sim, psi_data];
 
 %% Plotting
@@ -300,6 +306,7 @@ state_hist = out.flight_history.Data';
 % 3D plot
 figure(); grid on; hold on;
 scatter3(state_hist(1,:),state_hist(2,:),state_hist(3,:),30,t,"filled")
+plot3(x_data, y_data, z_data, '--k', 'LineWidth', 2); 
 % Create a colormap with 256 colors that goes from green to red.
 m = 256; % Number of Colours
 cMap = interp1([0;1], [0 1 0; 1 0 0], linspace(0,1,m)); % Start Green End Red
@@ -314,15 +321,21 @@ zlim([-20 0])
 set(gca,'YDir','reverse');
 set(gca,'ZDir','reverse');
 view(215,45)
+legend("Actual Flight Path", "Desired Trajectory", 'Location', 'best');
 
 % Position (x,y,z)
 figure(); hold on; grid on;
 plot(t, state_hist(1:3,:), LineWidth=1.2)
+plot(t_sim, x_data, ':k', 'LineWidth', 1.0);
+plot(t_sim, y_data, '-.k', 'LineWidth', 1.0);
+plot(t_sim, z_data, '--r', 'LineWidth', 1.2); % Replaces your hardcoded yline
 xlabel("Time [s]",FontSize=14);
 ylabel("Inertial Position [m]",FontSize=14);
 yline(-2.0,'--r') % Desired z height (90% of 2m to account for 10% overshoot error)
 title("Inertial Position vs Time",FontSize=18);
-legend("x","y","z","Desired z");
+legend("Actual x", "Actual y", "Actual z", ...
+       "Desired x", "Desired y", "Desired z (Altitude)", ...
+       'Location', 'best');
 
 % Euler Angles
 figure(); hold on; grid on;
