@@ -94,7 +94,7 @@ p.vCruise = 0.40;             % [m/s]
 p.g = 9.81;                   % [m/s^2]
 
 % Path-following assumptions matching your requirements
-p.accel = 0.50;               % [m/s^2]
+p.accel = 0.40;               % [m/s^2]
 p.cornerHold = 5.0;           % [s] (Locked 5-second corner hold)
 p.overlap = 0.20;             % [-]
 p.posErrorStd = 0.05;         % [m]
@@ -377,7 +377,7 @@ ylabel("Radians [rad]",FontSize=14);
 % yline(deg2rad(25),'--r')
 % yline(-deg2rad(25),'--r')
 title("Euler Angles vs Time",FontSize=18);
-legend("phi","theta","psi");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
+legend("\phi","\theta","\psi");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
 
 % Linear Velocities
 figure(); hold on; grid on;
@@ -429,7 +429,7 @@ ylabel("Position Error [m]", 'FontSize', 14);
 title("Inertial Position Tracking Error vs Time", 'FontSize', 18);
 
 legend("X Error (North)", "Y Error (East)", "Z Error (Up)", ...
-       "Total 3D Error Magnitude", "Allowed 2\sigma Bounds (\pm0.05m)", ...
+       "Total 3D Error Magnitude", "Allowed 2\sigma Bounds (\pm0.10m)", ...
        'Location', 'best');
 
 % 5. Print Descriptive Statistical Summary to Command Window for the Team
