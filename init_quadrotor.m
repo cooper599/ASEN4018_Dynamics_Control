@@ -5,10 +5,24 @@ g = 9.81; % m/s^2
 
 % Will be changing
 m = 872.10/1000; % kg (max)
+% 
+% J = [ 0.02079801611,  0.00530252330,  0.00751732970;
+%       0.00530252330,  0.01801195838,  0.00977792229;
+%       0.00751732970,  0.00977792229,  0.01101529893 ];
 
-J = [ 0.02079801611,  0.00530252330,  0.00751732970;
-      0.00530252330,  0.01801195838,  0.00977792229;
-      0.00751732970,  0.00977792229,  0.01101529893 ];
+% Diagonal Moments of Inertia (Stay positive)
+Ixx = 2.07980161;
+Iyy = 1.80119584;
+Izz = 1.10152989;
+
+% Off-Diagonal Products of Inertia (Flip the signs from your CAD output)
+Ixy = -0.53025233;
+Ixz = -0.75173297;
+Iyz = -0.97779223;
+
+J = [ Ixx, Ixy, Ixz; 
+      Ixy, Iyy, Iyz; 
+      Ixz, Iyz, Izz ];
 
 Ix = J(1,1);
 Iy = J(2,2);
@@ -50,6 +64,7 @@ init_cond = [0; 0; 0;  % x,y,z
              0; 0; 0]; % p,q,r
 
 %% Control Gains
+
 % Vertical Gains
 % Kpz = 150.0;
 % Kiz = 0.5;
@@ -57,33 +72,61 @@ init_cond = [0; 0; 0;  % x,y,z
 Kpz = 13.80865;
 Kiz = 0.0;
 % Kiz = Kpz / 1000;
-Kdz = 8.4609; % W
+% Kdz = 8.4609; % W
+Kdz = 6.94047;
 
 % Roll and Pitch gains
 Kpphi = 24.48955;
+% Kiphi = 2.44895/2;
 Kiphi = 2.44895;
 Kdphi = 0.92686; % p
+% Kdphi = 1.5;
 
 Kptheta = 14.58697;
+% Kitheta = 1.45870/2;
 Kitheta = 1.45870;
 Kdtheta = 0.55207; % q
+% Kdtheta = 1.0;
 
 % Yaw gains
 Kppsi = 7.26562;
+% Kipsi = 0.72656/2;
 Kipsi = 0.72656;
 Kdpsi = 0.36518; % r
+% Kdpsi = 0.8;
 
 % Velocity specific gains
 % Kpu = 0.81125;
 % Kpv = 0.81125;
-Kpu = 1.62250;
-Kpv = 1.62250;
+Kpu = 1.62250/0.25;
+Kpv = 1.62250/0.25;
 
 % Outerloop gains
 % Kpx = 0.39792;
 % Kpy = 0.39792;
 Kpx = 1.59167;
 Kpy = 1.59167;
+
+
+%{
+Kpphi =   3.88870;  Kiphi =    0.38887;  Kdphi =    0.46334;
+
+Kptheta = 2.31627;
+Kitheta =  0.23163;
+Kdtheta = 0.27598;
+
+Kppsi = 1.15371;
+Kipsi = 0.11537;
+Kdpsi = 0.14552;
+
+Kpz =    2.19268;  Kiz =   0;  Kdz =    2.76567;
+
+Kpu = 0.64654;
+Kpv = 0.64654;
+
+Kpx = 0.63426;
+Kpy = 0.63426;
+%}
 
 %% Navigation (High-Fidelity Inset Lawnmower Generation & Kinematic Profile)
 % 1. Grid Geometry, Camera Specs, and Kinematic Setup
@@ -379,16 +422,30 @@ ylabel("Radians [rad]",FontSize=14);
 title("Euler Angles vs Time",FontSize=18);
 legend("\phi","\theta","\psi");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
 
-% Linear Velocities
-figure(); hold on; grid on;
-plot(t, state_hist(7:9,:), LineWidth=1.2)
-xlabel("Time [s]",FontSize=14);
-ylabel("Velocity [m/s]",FontSize=14);
-% Velocity limits
-yline(0.5,'--r')
-yline(-0.5,'--r')
-title("Velocities vs Time",FontSize=18);
-legend("u","v","w","Upper/Lower Bounds on Velocity");
+% % Linear Velocities
+% figure(); hold on; grid on;
+% plot(t, state_hist(7:9,:), LineWidth=1.2)
+% xlabel("Time [s]",FontSize=14);
+% ylabel("Velocity [m/s]",FontSize=14);
+% % Velocity limits
+% yline(0.5,'--r')
+% yline(-0.5,'--r')
+% title("Velocities vs Time",FontSize=18);
+% legend("u","v","w","Upper/Lower Bounds on Velocity");
+figure(); hold on;
+plot(t, state_hist(7:9,:), 'LineWidth', 1.2);
+plot(t_sim, vx_data, ':k', 'LineWidth', 1.0);
+plot(t_sim, vy_data, '-.k', 'LineWidth', 1.0);
+plot(t_sim, vz_data, '--r', 'LineWidth', 1.2);
+yline(0.5, '--r', 'LineWidth', 1.0);
+yline(-0.5, '--r', 'LineWidth', 1.0); % Combines into the single visual bound
+xlabel("Time [s]", 'FontSize', 14);
+ylabel("Velocity [m/s]", 'FontSize', 14);
+title("Velocities vs Time", 'FontSize', 18);
+legend("Actual u", "Actual v", "Actual w", ...
+       "Desired Vx", "Desired Vy", "Desired Vz", ...
+       "Velocity Bounds", ...
+       'Location', 'best');
 
 % Angular Velocities
 figure(); hold on; grid on;
