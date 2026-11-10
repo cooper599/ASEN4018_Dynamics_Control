@@ -111,14 +111,14 @@ m = 872.10 / 1000; % 0.8721 kg
 g = 9.81;          % m/s^2
 
 % Full Inertia Tensor Matrix
-Ixx = 2.07980161;
-Iyy = 1.80119584;
-Izz = 1.10152989;
+Ixx = 40973.01 * 1e-7; % 0.0040973 kg*m^2
+Iyy = 75297.41 * 1e-7; % 0.0075297 kg*m^2
+Izz = 41206.15 * 1e-7; % 0.0041206 kg*m^2
 
-% Off-Diagonal Products of Inertia (Flip the signs from your CAD output)
-Ixy = -0.53025233;
-Ixz = -0.75173297;
-Iyz = -0.97779223;
+% Transpose/Parallel Axis effects disappear at CoM. Off-diagonals are negligible.
+Ixy = -215.54  * 1e-7; 
+Ixz =  387.34  * 1e-7; 
+Iyz =  684.91  * 1e-7; 
 
 J = [ Ixx, Ixy, Ixz; 
       Ixy, Iyy, Iyz; 
@@ -128,16 +128,16 @@ J_inv = inv(J);
 % Primary Base Multipliers derived from your optimal surface point
 wn_inner   = opt_wn_inner; 
 zeta_inner = opt_zeta;
-Kp_mult = wn_inner^2;               % 1583.38
-Kd_mult = 2 * zeta_inner * wn_inner; % 59.93
+Kp_mult = wn_inner^2;               % 
+Kd_mult = 2 * zeta_inner * wn_inner; % 
 
 Kpphi = Kp_mult / J_inv(1,1);     
 Kdphi = Kd_mult / J_inv(1,1);     
-Kiphi = Kpphi * 0.1;              
+Kiphi = Kpphi * 0.05;              
 
 Kptheta = Kp_mult / J_inv(2,2);   
 Kdtheta = Kd_mult / J_inv(2,2);   
-Kitheta = Kptheta * 0.1;          
+Kitheta = Kptheta * 0.05;          
 
 % =========================================================================
 % 1. VERTICAL LOOP: Altitude (z) Control Gains
@@ -155,8 +155,8 @@ zeta_z = 1.0; % critically damped
 wn_z = wn_inner / 10;
 Kpz = (wn_z^2) * m;               
 Kdz = (2 * zeta_z * wn_z) * m;     
-Kiz = Kpz * 0.1;
-% Kiz = 0.0;
+% Kiz = Kpz * 0.05;
+Kiz = 0.0;
 
 Jzz = 1 / J_inv(3,3);
 Jxx = 1 / J_inv(1,1);
@@ -178,7 +178,7 @@ wn_yaw = wn_inner;
 zeta_yaw = 1.0;
 Kppsi = (wn_yaw^2) / J_inv(3,3);  
 Kdpsi = (2 * zeta_yaw * wn_yaw) / J_inv(3,3); 
-Kipsi = Kppsi * 0.1;
+Kipsi = Kppsi * 0.05;
 
 % =========================================================================
 % 3. MID LOOP: Translational Velocity (u, v) Control Gains
@@ -192,15 +192,15 @@ Kipsi = Kppsi * 0.1;
 %   - Integral Gain:     Kiu = 10% of Kpu                   (Wind/bias rejection)
 % =========================================================================
 
-% wn_mid = wn_inner / 10.0;
-wn_mid = wn_inner / 5.0;
+wn_mid = wn_inner / sep;
+% wn_mid = wn_inner / 5.0;
 zeta_mid = 1.0; 
 
 Kpu = (2 * zeta_mid * wn_mid) / g; 
 Kpv = Kpu;
 Kdu = (wn_mid^2) / g;              
 Kdv = Kdu;
-Kiu = Kpu * 0.1;
+Kiu = Kpu * 0.05;
 Kiv = Kiu;
 
 % =========================================================================
@@ -214,11 +214,12 @@ Kiv = Kiu;
 %   - Integral Gain:     Kix = 10% of Kpx (drifting error compensation)
 % =========================================================================
 
-wn_outer = wn_mid / 5.0;
+% wn_outer = wn_mid / 5.0;
+wn_outer = wn_mid / sep;
 
 Kpx = wn_outer;                    
 Kpy = Kpx;
-Kix = Kpx * 0.1;
+Kix = Kpx * 0.05;
 Kiy = Kix;
 
 % =========================================================================
@@ -237,7 +238,7 @@ fprintf('  Yaw (psi)    ->  Kp = %10.5f,  Ki = %10.5f,  Kd = %10.5f\n', Kppsi, K
 fprintf('  Altitude (Z) ->  Kp = %10.5f,  Ki = %10.5f,  Kd = %10.5f\n\n', Kpz, Kiz, Kdz);
 
 % fprintf('  [LAYER 2: TRANSLATIONAL VELOCITY LOOP (10x Time-Scale Separation)]\n');
-fprintf('  [LAYER 2: TRANSLATIONAL VELOCITY LOOP (5x Time-Scale Separation)]\n');
+fprintf('  [LAYER 2: TRANSLATIONAL VELOCITY LOOP (10x Time-Scale Separation)]\n');
 fprintf('  ---------------------------------------------------------------\n');
 % fprintf('  U Velocity   ->  Kp = %10.5f,  Ki = %10.5f,  Kd = %10.5f\n', Kpu, Kiu, Kdu);
 % fprintf('  V Velocity   ->  Kp = %10.5f,  Ki = %10.5f,  Kd = %10.5f\n\n', Kpv, Kiv, Kdv);
@@ -245,7 +246,7 @@ fprintf('  U Velocity   ->  Kp = %10.5f\n',Kpu);
 fprintf('  V Velocity   ->  Kp = %10.5f\n',Kpv);
 
 % fprintf('  [LAYER 3: OUTERMOST SPATIAL NAVIGATION (100x Separation Corridor)]\n');
-fprintf('  [LAYER 3: OUTERMOST SPATIAL NAVIGATION (25x Separation Corridor)]\n');
+fprintf('  [LAYER 3: OUTERMOST SPATIAL NAVIGATION (100x Separation Corridor)]\n');
 fprintf('  ---------------------------------------------------------------\n');
 fprintf('  X Position   ->  Kp = %10.5f\n',Kpx);
 fprintf('  Y Position   ->  Kp = %10.5f\n',Kpy);

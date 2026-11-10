@@ -11,14 +11,14 @@ m = 872.10/1000; % kg (max)
 %       0.00751732970,  0.00977792229,  0.01101529893 ];
 
 % Diagonal Moments of Inertia (Stay positive)
-Ixx = 2.07980161;
-Iyy = 1.80119584;
-Izz = 1.10152989;
+Ixx = 40973.01 * 1e-7; % 0.0040973 kg*m^2
+Iyy = 75297.41 * 1e-7; % 0.0075297 kg*m^2
+Izz = 41206.15 * 1e-7; % 0.0041206 kg*m^2
 
-% Off-Diagonal Products of Inertia (Flip the signs from your CAD output)
-Ixy = -0.53025233;
-Ixz = -0.75173297;
-Iyz = -0.97779223;
+% Transpose/Parallel Axis effects disappear at CoM. Off-diagonals are negligible.
+Ixy = -215.54  * 1e-7; 
+Ixz =  387.34  * 1e-7; 
+Iyz =  684.91  * 1e-7; 
 
 J = [ Ixx, Ixy, Ixz; 
       Ixy, Iyy, Iyz; 
@@ -65,6 +65,7 @@ init_cond = [0; 0; 0;  % x,y,z
 
 %% Control Gains
 
+%{
 % Vertical Gains
 % Kpz = 150.0;
 % Kiz = 0.5;
@@ -106,27 +107,32 @@ Kpv = 1.62250/0.25;
 % Kpy = 0.39792;
 Kpx = 1.59167;
 Kpy = 1.59167;
-
-
-%{
-Kpphi =   3.88870;  Kiphi =    0.38887;  Kdphi =    0.46334;
-
-Kptheta = 2.31627;
-Kitheta =  0.23163;
-Kdtheta = 0.27598;
-
-Kppsi = 1.15371;
-Kipsi = 0.11537;
-Kdpsi = 0.14552;
-
-Kpz =    2.19268;  Kiz =   0;  Kdz =    2.76567;
-
-Kpu = 0.64654;
-Kpv = 0.64654;
-
-Kpx = 0.63426;
-Kpy = 0.63426;
 %}
+
+
+% %{
+Kpphi =   6.48691;  
+Kiphi =    0.32435;  
+Kdphi =    0.24546;
+
+Kptheta = 11.92047;
+Kitheta =  0.59602;
+Kdtheta = 0.45107;
+
+Kppsi = 6.52294;
+Kipsi = 0.32615;
+Kdpsi = 0.32785;
+
+Kpz =    13.80868;  
+Kiz =   0;  
+Kdz =    6.94047;
+
+Kpu = 0.81125;
+Kpv = 0.81125;
+
+Kpx = 0.39792;
+Kpy = 0.39792;
+% %}
 
 %% Navigation (High-Fidelity Inset Lawnmower Generation & Kinematic Profile)
 % 1. Grid Geometry, Camera Specs, and Kinematic Setup
@@ -422,29 +428,20 @@ ylabel("Radians [rad]",FontSize=14);
 title("Euler Angles vs Time",FontSize=18);
 legend("\phi","\theta","\psi");%,"Upper Bound Roll Angle","Lower Bound Roll Angle");%,"psi");
 
-% % Linear Velocities
-% figure(); hold on; grid on;
-% plot(t, state_hist(7:9,:), LineWidth=1.2)
-% xlabel("Time [s]",FontSize=14);
-% ylabel("Velocity [m/s]",FontSize=14);
-% % Velocity limits
-% yline(0.5,'--r')
-% yline(-0.5,'--r')
-% title("Velocities vs Time",FontSize=18);
-% legend("u","v","w","Upper/Lower Bounds on Velocity");
+% Linear Velocities
 figure(); hold on;
 plot(t, state_hist(7:9,:), 'LineWidth', 1.2);
-plot(t_sim, vx_data, ':k', 'LineWidth', 1.0);
-plot(t_sim, vy_data, '-.k', 'LineWidth', 1.0);
-plot(t_sim, vz_data, '--r', 'LineWidth', 1.2);
 yline(0.5, '--r', 'LineWidth', 1.0);
 yline(-0.5, '--r', 'LineWidth', 1.0); % Combines into the single visual bound
+yline(0.4, '--k', 'LineWidth', 1.0);
+yline(-0.4, '--k', 'LineWidth', 1.0); % Combines into the single visual bound
+
 xlabel("Time [s]", 'FontSize', 14);
 ylabel("Velocity [m/s]", 'FontSize', 14);
 title("Velocities vs Time", 'FontSize', 18);
 legend("Actual u", "Actual v", "Actual w", ...
-       "Desired Vx", "Desired Vy", "Desired Vz", ...
-       "Velocity Bounds", ...
+       "Velocity Bounds","", ...
+       "Desired Cruise Velocities",...
        'Location', 'best');
 
 % Angular Velocities
@@ -455,50 +452,66 @@ ylabel("Angular velocities [rad/s]",FontSize=14);
 title("Angular Velocities vs Time",FontSize=18);
 legend("p","q","r");
 
-%% Position Error Analysis for Localization Team
-% 1. Resample Desired Trajectory to Match Actual Simulation Time (t)
-x_des_interp = interp1(t_sim, x_data, t, 'linear', 'extrap');
-y_des_interp = interp1(t_sim, y_data, t, 'linear', 'extrap');
-z_des_interp = interp1(t_sim, z_data, t, 'linear', 'extrap');
+%% Spatial Path Deviation Analysis for Localization Team (Time-Independent)
+% 1. Re-structure the full planned path geometry as a [N x 3] coordinate matrix
+path_geometry = [x_data(:), y_data(:), z_data(:)];
 
-% 2. Calculate Tracking Error (Error = Desired - Actual)
-% In control engineering, a positive error means the drone is lagging behind the target
-error_x = x_des_interp - state_hist(1,:)';
-error_y = y_des_interp - state_hist(2,:)';
-error_z = z_des_interp - state_hist(3,:)'; % Up direction
+% Extract actual drone path history from state history matrix [3 x M] -> [M x 3]
+actual_positions = state_hist(1:3, :)'; 
 
-% 3. Calculate 3D Euclidean Tracking Error Magnitude
-error_3d_mag = sqrt(error_x.^2 + error_y.^2 + error_z.^2);
+M = size(actual_positions, 1);
+xy = zeros(M, 3);
+distance_3d = zeros(M, 1);
 
-% 4. Generate the Position Error Timeline Plot
+% 2. Vectorized projection: Find the absolute closest point on the path for every time step
+for i = 1:M
+    % Compute Euclidean distances from the current drone position to ALL path points
+    diffs = path_geometry - actual_positions(i, :);
+    sq_distances = sum(diffs.^2, 2);
+    
+    % Find index of the absolute closest path point (orthogonal projection baseline)
+    [~, min_idx] = min(sq_distances);
+    
+    xy(i, :) = path_geometry(min_idx, :);
+    distance_3d(i) = sqrt(sq_distances(min_idx));
+end
+
+% 3. Extract components of geometric cross-track deviation
+% deviation = Path Coordinate - Actual Coordinate
+error_x_spatial = xy(:,1) - actual_positions(:,1);
+error_y_spatial = xy(:,2) - actual_positions(:,2);
+error_z_spatial = xy(:,3) - actual_positions(:,3);
+
+% 4. Generate the Position Spatial Deviation Timeline Plot
 figure(); hold on; grid on;
-plot(t, error_x, 'Color', [0 0.4470 0.7410], 'LineWidth', 1.5); % Blue
-plot(t, error_y, 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5); % Orange
-plot(t, error_z, 'Color', [0.9290 0.6940 0.1250], 'LineWidth', 1.5); % Yellow
-plot(t, error_3d_mag, ':k', 'LineWidth', 1.2); % Dashed Black for Magnitude
+plot(t, error_x_spatial, 'Color', [0 0.4470 0.7410], 'LineWidth', 1.5); % Blue
+plot(t, error_y_spatial, 'Color', [0.8500 0.3250 0.0980], 'LineWidth', 1.5); % Orange
+plot(t, error_z_spatial, 'Color', [0.9290 0.6940 0.1250], 'LineWidth', 1.5); % Yellow
+plot(t, distance_3d, ':k', 'LineWidth', 1.2); % Dashed Black for True Spatial Distance
 
 % Reference bounds matching your path requirements
 yline(p.posErrorStd*2, '--r', 'LineWidth', 1.0);
 yline(-p.posErrorStd*2, '--r', 'LineWidth', 1.0);
 
 xlabel("Time [s]", 'FontSize', 14);
-ylabel("Position Error [m]", 'FontSize', 14);
-title("Inertial Position Tracking Error vs Time", 'FontSize', 18);
+ylabel("Cross-Track Deviation [m]", 'FontSize', 14);
+title("Inertial Cross-Track Spatial Deviation vs Time", 'FontSize', 18);
 
-legend("X Error (North)", "Y Error (East)", "Z Error (Up)", ...
-       "Total 3D Error Magnitude", "Allowed 2\sigma Bounds (\pm0.10m)", ...
+legend("X Spatial Deviation (North)", "Y Spatial Deviation (East)", "Z Spatial Deviation (Up)", ...
+       "Total 3D Spatial Distance", "Allowed 2\sigma Bounds (\pm0.10m)", ...
        'Location', 'best');
 
-% 5. Print Descriptive Statistical Summary to Command Window for the Team
+% 5. Print Descriptive Geometric Summary to Command Window for the Team
 fprintf('\n==================================================\n');
-fprintf('        LOCALIZATION TEAM METRICS SUMMARY         \n');
+fprintf('    LOCALIZATION METRICS: CROSS-TRACK DEVIATION   \n');
+fprintf('   (Time-Independent Spatial Orthogonal Analysis) \n');
 fprintf('==================================================\n');
-fprintf('Maximum X Error (North):    %8.4f m\n', max(abs(error_x)));
-fprintf('Maximum Y Error (East):     %8.4f m\n', max(abs(error_y)));
-fprintf('Maximum Z Error (Altitude): %8.4f m\n', max(abs(error_z)));
+fprintf('Max X Cross-Track Error:    %8.4f m\n', max(abs(error_x_spatial)));
+fprintf('Max Y Cross-Track Error:    %8.4f m\n', max(abs(error_y_spatial)));
+fprintf('Max Z Cross-Track Error:    %8.4f m\n', max(abs(error_z_spatial)));
 fprintf('--------------------------------------------------\n');
-fprintf('RMS X Error:               %8.4f m\n', rms(error_x));
-fprintf('RMS Y Error:               %8.4f m\n', rms(error_y));
-fprintf('RMS Z Error:               %8.4f m\n', rms(error_z));
-fprintf('Peak Total 3D Deviation:    %8.4f m\n', max(error_3d_mag));
+fprintf('RMS X Cross-Track Error:    %8.4f m\n', rms(error_x_spatial));
+fprintf('RMS Y Cross-Track Error:    %8.4f m\n', rms(error_y_spatial));
+fprintf('RMS Z Cross-Track Error:    %8.4f m\n', rms(error_z_spatial));
+fprintf('Peak Total 3D Path Distance: %8.4f m\n', max(distance_3d));
 fprintf('==================================================\n');
