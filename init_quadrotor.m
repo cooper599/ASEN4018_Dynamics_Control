@@ -4,21 +4,17 @@
 g = 9.81; % m/s^2
 
 % Will be changing
-m = 872.10/1000; % kg (max)
-% 
-% J = [ 0.02079801611,  0.00530252330,  0.00751732970;
-%       0.00530252330,  0.01801195838,  0.00977792229;
-%       0.00751732970,  0.00977792229,  0.01101529893 ];
+m = 1544.28/1000; % kg (max)
 
 % Diagonal Moments of Inertia (Stay positive)
-Ixx = 40973.01 * 1e-7; % 0.0040973 kg*m^2
-Iyy = 75297.41 * 1e-7; % 0.0075297 kg*m^2
-Izz = 41206.15 * 1e-7; % 0.0041206 kg*m^2
+Ixx = 89245.98 * 1e-7;
+Iyy = 151302.79 * 1e-7;
+Izz = 86887.83 * 1e-7;
 
 % Transpose/Parallel Axis effects disappear at CoM. Off-diagonals are negligible.
-Ixy = -215.54  * 1e-7; 
-Ixz =  387.34  * 1e-7; 
-Iyz =  684.91  * 1e-7; 
+Ixy = -783.09  * 1e-7; 
+Ixz =  889.34  * 1e-7; 
+Iyz =  1699.51  * 1e-7; 
 
 J = [ Ixx, Ixy, Ixz; 
       Ixy, Iyy, Iyz; 
@@ -30,7 +26,7 @@ Iz = J(3,3);
 
 Jinv = inv(J);
 
-cond(J)
+% cond(J)
 
 % Matrices to run with simulink
 A = [0 0 0 0 0 0 1 0 0 0 0 0;
@@ -111,27 +107,27 @@ Kpy = 1.59167;
 
 
 % %{
-Kpphi =   6.48691;  
-Kiphi =    0.32435;  
-Kdphi =    0.24546;
+Kpphi =   14.12894;  
+Kiphi =    0.70645;  
+Kdphi =    0.53463;
 
-Kptheta = 11.92047;
-Kitheta =  0.59602;
-Kdtheta = 0.45107;
+Kptheta = 23.95062;
+Kitheta =  1.19753;
+Kdtheta = 0.90628;
 
-Kppsi = 6.52294;
-Kipsi = 0.32615;
-Kdpsi = 0.32785;
+Kppsi = 13.75321;
+Kipsi = 0.68766;
+Kdpsi = 0.69126;
 
-Kpz =    13.80868;  
+Kpz =    24.45186;  
 Kiz =   0;  
-Kdz =    6.94047;
+Kdz =    12.28992;
 
-Kpu = 0.81125;
-Kpv = 0.81125;
+Kpu = 1.62250*2;
+Kpv = 1.62250*2;
 
-Kpx = 0.39792;
-Kpy = 0.39792;
+Kpx = 1.59167;
+Kpy = 1.59167;
 % %}
 
 %% Navigation (High-Fidelity Inset Lawnmower Generation & Kinematic Profile)
@@ -515,3 +511,25 @@ fprintf('RMS Y Cross-Track Error:    %8.4f m\n', rms(error_y_spatial));
 fprintf('RMS Z Cross-Track Error:    %8.4f m\n', rms(error_z_spatial));
 fprintf('Peak Total 3D Path Distance: %8.4f m\n', max(distance_3d));
 fprintf('==================================================\n');
+
+%%
+figure(); hold on;
+plot(t, state_hist(8,:), 'LineWidth', 1.2);
+yline(0.5, '--r', 'LineWidth', 1.0);
+yline(0.4, '--k', 'LineWidth', 1.0);
+yline(0.9*0.4,'--b','LineWidth',1.0)
+yline(0.1*0.4,'--b','LineWidth',1.0)
+yline(0.05*0.4,'--m','LineWidth',1.0)
+yline(-0.05*0.4,'--m','LineWidth',1.0)
+yline(0, '-', 'Color', '#7F8C8D', 'LineWidth', 1.2);
+xlim([20 40])
+
+xlabel("Time [s]", 'FontSize', 14);
+ylabel("Velocity [m/s]", 'FontSize', 14);
+title("Velocities vs Time", 'FontSize', 18);
+legend("Actual v",...
+       "Velocity Bound",...
+       "Desired Cruise Velocity",...
+       "Rise Time 10%,90%","",...
+       "Settling Time 5% Limit","",...
+       'Location', 'best');

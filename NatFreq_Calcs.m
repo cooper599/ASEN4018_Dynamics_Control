@@ -21,7 +21,7 @@ Omega_n_mid = -log(p) ./ (ZETA .* TS);
 
 % Inner loop targets
 Omega_n_inner_rps = Omega_n_mid * sep;      % in radians per second
-% Omega_n_inner_rps = Omega_n_mid * 5.0;      % in radians per second
+% Omega_n_inner_rps = Omega_n_mid * 10.0;      % in radians per second
 Omega_n_inner_hz  = Omega_n_inner_rps / (2 * pi); % in Hertz
 
 % --- NEW: Calculate the Mid Velocity Loop Rise Time across the mesh ---
@@ -106,19 +106,20 @@ grid on;
 % =========================================================================
 % MATHEMATICALLY TUNED CONTROL GAINS (T_s = 1.0s, T_r = 0.4s Corridor)
 % =========================================================================
-% Vehicle Constant Definitions
-m = 872.10 / 1000; % 0.8721 kg
 g = 9.81;          % m/s^2
 
-% Full Inertia Tensor Matrix
-Ixx = 40973.01 * 1e-7; % 0.0040973 kg*m^2
-Iyy = 75297.41 * 1e-7; % 0.0075297 kg*m^2
-Izz = 41206.15 * 1e-7; % 0.0041206 kg*m^2
+% Vehicle Constant Definitions
+m = 1544.28/1000; % kg (max)
+
+% Diagonal Moments of Inertia (Stay positive)
+Ixx = 89245.98 * 1e-7; % 0.0040973 kg*m^2
+Iyy = 151302.79 * 1e-7; % 0.0075297 kg*m^2
+Izz = 86887.83 * 1e-7; % 0.0041206 kg*m^2
 
 % Transpose/Parallel Axis effects disappear at CoM. Off-diagonals are negligible.
-Ixy = -215.54  * 1e-7; 
-Ixz =  387.34  * 1e-7; 
-Iyz =  684.91  * 1e-7; 
+Ixy = -783.09  * 1e-7; 
+Ixz =  889.34  * 1e-7; 
+Iyz =  1699.51  * 1e-7; 
 
 J = [ Ixx, Ixy, Ixz; 
       Ixy, Iyy, Iyz; 
@@ -152,7 +153,7 @@ Kitheta = Kptheta * 0.05;
 % =========================================================================
 
 zeta_z = 1.0; % critically damped
-wn_z = wn_inner / 10;
+wn_z = wn_inner / sep;
 Kpz = (wn_z^2) * m;               
 Kdz = (2 * zeta_z * wn_z) * m;     
 % Kiz = Kpz * 0.05;
@@ -192,16 +193,14 @@ Kipsi = Kppsi * 0.05;
 %   - Integral Gain:     Kiu = 10% of Kpu                   (Wind/bias rejection)
 % =========================================================================
 
-wn_mid = wn_inner / sep;
-% wn_mid = wn_inner / 5.0;
-zeta_mid = 1.0; 
+% wn_mid = wn_inner / sep;
+wn_mid = wn_inner / 5.0;
+zeta_mid = 1.0;
+% zeta_mid = 1.25;
 
 Kpu = (2 * zeta_mid * wn_mid) / g; 
+% Kpu = wn_mid/g;
 Kpv = Kpu;
-Kdu = (wn_mid^2) / g;              
-Kdv = Kdu;
-Kiu = Kpu * 0.05;
-Kiv = Kiu;
 
 % =========================================================================
 % 4. OUTER LOOP: Spatial Position (x, y) Control Gains
@@ -214,13 +213,11 @@ Kiv = Kiu;
 %   - Integral Gain:     Kix = 10% of Kpx (drifting error compensation)
 % =========================================================================
 
-% wn_outer = wn_mid / 5.0;
-wn_outer = wn_mid / sep;
+wn_outer = wn_mid / 5.0;
+% wn_outer = wn_mid / sep;
 
 Kpx = wn_outer;                    
 Kpy = Kpx;
-Kix = Kpx * 0.05;
-Kiy = Kix;
 
 % =========================================================================
 % EXPANDED VERIFICATION PRINT STATEMENT
